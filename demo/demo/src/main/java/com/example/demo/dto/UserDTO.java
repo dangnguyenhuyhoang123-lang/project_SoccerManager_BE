@@ -15,4 +15,5 @@ public class UserDTO {
     private String displayName;
     private Boolean status;
     private List<String> roles;
+    private Long teamId;
 }

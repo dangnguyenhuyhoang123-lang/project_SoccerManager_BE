@@ -17,4 +17,6 @@ public interface PlayerRepository extends JpaRepository<Player, Long> {
     Page<Player> findByPositionAndStatus(String position, String status, Pageable pageable);
 
     Optional<Player> findByIDCode(String idCode);
+
+    Page<Player> findByTeamId(Long teamId, Pageable pageable );
 }

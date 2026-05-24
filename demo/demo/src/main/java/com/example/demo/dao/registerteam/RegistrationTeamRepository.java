@@ -10,20 +10,22 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface RegistrationTeamRepo extends JpaRepository<RegistrationTeam, Long> {
+public interface RegistrationTeamRepository extends JpaRepository<RegistrationTeam, Long> {
 
-    @EntityGraph(attributePaths = {"season", "players", "coaches"})
+    @EntityGraph(attributePaths = {"season", "team"})
     List<RegistrationTeam> findAllByOrderByCreatedAtDesc();
 
-    @EntityGraph(attributePaths = {"season", "players", "coaches"})
+    @EntityGraph(attributePaths = {"season", "team"})
     List<RegistrationTeam> findByStatusOrderByCreatedAtDesc(RegistrationStatus status);
 
-    @EntityGraph(attributePaths = {"season", "players", "coaches"})
+    @EntityGraph(attributePaths = {"season", "team", "team.stadium"})
     Optional<RegistrationTeam> findOneById(Long id);
 
-    boolean existsBySeasonIdAndNameIgnoreCaseAndStatusIn(Long seasonId,
-                                                         String name,
-                                                         List<RegistrationStatus> statuses);
+    boolean existsBySeasonIdAndNameAtRegistrationIgnoreCaseAndStatusIn(
+            Long seasonId,
+            String nameAtRegistration,
+            List<RegistrationStatus> statuses
+    );
 
 
 

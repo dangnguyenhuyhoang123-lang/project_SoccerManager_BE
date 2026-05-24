@@ -2,7 +2,9 @@ package com.example.demo.service.registrationclub;
 
 import com.example.demo.dao.CoachRepository;
 import com.example.demo.dao.player.PlayerRepository;
-import com.example.demo.dao.registerteam.RegistrationTeamRepo;
+import com.example.demo.dao.registerteam.RegistrationCoachRepository;
+import com.example.demo.dao.registerteam.RegistrationPlayerRepository;
+import com.example.demo.dao.registerteam.RegistrationTeamRepository;
 import com.example.demo.dao.season.SeasonRepository;
 import com.example.demo.dao.season.SeasonTeamRepository;
 import com.example.demo.dao.team.TeamRepository;
@@ -29,17 +31,18 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class RegistrationService {
 
-    private final RegistrationTeamRepo teamRegRepo;
+    private final RegistrationTeamRepository teamRegRepo;
     private final SeasonRepository seasonRepository;
     private final TeamRepository teamRepository;
     private final SeasonTeamRepository seasonTeamRepository;
-    private final RegistrationTeamRepo registrationTeamRepository;
+    private final RegistrationTeamRepository registrationTeamRepository;
+    private final RegistrationPlayerRepository registrationPlayerRepository;
+    private final RegistrationCoachRepository registrationCoachRepository;
     private final PlayerRepository playerRepository;
     private  final CoachRepository coachRepository;
 
@@ -153,7 +156,9 @@ public class RegistrationService {
         RegistrationTeam registration = teamRegRepo.findOneById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn đăng ký"));
 
-        return toDetailDto(registration);
+        List<RegistrationPlayer> registrationPlayers = registrationPlayerRepository.findByRegistrationTeamId(registration.getId());
+        List<RegistrationCoach> registrationCoaches = registrationCoachRepository.findByRegistrationTeamId(registration.getId());
+        return toDetailDto(registration, registrationPlayers, registrationCoaches);
     }
 
 
@@ -262,14 +267,18 @@ public class RegistrationService {
                 reg.getTeam() != null ? reg.getTeam().getName() : null,
                 reg.getTeam() != null ? reg.getTeam().getCity() : null,
                 reg.getStatus(),
-                reg.getPlayers() != null ? reg.getPlayers().size() : 0,
-                reg.getCoaches() != null ? reg.getCoaches().size() : 0,
+                Math.toIntExact(registrationPlayerRepository.countByRegistrationTeamId(reg.getId())),
+                Math.toIntExact(registrationCoachRepository.countByRegistrationTeamId(reg.getId())),
                 reg.getCreatedAt(),
                 reg.getNote()
         );
     }
 
-    private RegistrationDetailDTO toDetailDto(RegistrationTeam reg) {
+    private RegistrationDetailDTO toDetailDto(
+            RegistrationTeam reg,
+            List<RegistrationPlayer> registrationPlayers,
+            List<RegistrationCoach> registrationCoaches
+    ) {
         Team team = reg.getTeam();
         RegistrationStadium stadium = reg.getStadium();
 
@@ -296,7 +305,7 @@ public class RegistrationService {
                 reg.getCreatedAt(),
 
                 // Map thông tin cầu thủ từ Object Player gốc
-                reg.getPlayers() == null ? List.of() : reg.getPlayers().stream()
+                registrationPlayers == null ? List.of() : registrationPlayers.stream()
                         .map(rp -> {
                             Player p = rp.getPlayer();
                             return new RegistrationPlayerViewDTO(
@@ -313,7 +322,7 @@ public class RegistrationService {
                         }).toList(),
 
                 // Map thông tin HLV từ Object Coach gốc
-                reg.getCoaches() == null ? List.of() : reg.getCoaches().stream()
+                registrationCoaches == null ? List.of() : registrationCoaches.stream()
                         .map(rc -> {
                             Coach c = rc.getCoach();
                             return new RegistrationCoachViewDTO(

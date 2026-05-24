@@ -19,7 +19,7 @@ public class RoundController {
         this.roundService = roundService;
     }
 
-    @GetMapping
+    @GetMapping("/getAllRoundBySeason")
     public Page<RoundResponse> getRounds(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -28,22 +28,22 @@ public class RoundController {
         return roundService.getRounds(page, size, seasonId);
     }
 
-    @GetMapping("/{id}")
+    @GetMapping("/getRound/{id}")
     public RoundResponse getRound(@PathVariable Integer id) {
         return roundService.getRound(id);
     }
 
-    @PostMapping
+    @PostMapping("/addRound")
     public RoundResponse createRound(@RequestBody RoundRequest request) {
         return roundService.create(request);
     }
 
-    @PutMapping("/{id}")
+    @PutMapping("/updateRound/{id}")
     public RoundResponse updateRound(@PathVariable Integer id, @RequestBody RoundRequest request) {
         return roundService.update(id, request);
     }
 
-    @DeleteMapping("/{id}")
+    @DeleteMapping("/deleteRound/{id}")
     public void deleteRound(@PathVariable Integer id) {
         roundService.delete(id);
     }

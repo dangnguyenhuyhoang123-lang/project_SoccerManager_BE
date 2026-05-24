@@ -1,8 +1,8 @@
 package com.example.demo.service.registrationclub;
 
 import com.example.demo.dao.player.PlayerSeasonRepository;
-import com.example.demo.dao.registerteam.RegistrationTeamRepo;
-import com.example.demo.dao.season.SeasonTeamCoachRepo;
+import com.example.demo.dao.registerteam.RegistrationTeamRepository;
+import com.example.demo.dao.season.SeasonTeamCoachRepository;
 import com.example.demo.dao.season.SeasonTeamRepository;
 import com.example.demo.entity.*;
 import com.example.demo.entity.registerclub.*;
@@ -17,10 +17,10 @@ import java.time.LocalDate;
 @RequiredArgsConstructor
 public class AdminApprovalService {
 
-    private final RegistrationTeamRepo registrationTeamRepository;
+    private final RegistrationTeamRepository registrationTeamRepository;
     private final SeasonTeamRepository seasonTeamRepository;
     private final PlayerSeasonRepository playerSeasonRepository;
-    private final SeasonTeamCoachRepo seasonTeamCoachRepository;
+    private final SeasonTeamCoachRepository seasonTeamCoachRepository;
     private final StandingService standingService;
 
     @Transactional
@@ -49,6 +49,7 @@ public class AdminApprovalService {
             ps.setTeam(team);
             ps.setSeason(season);
             ps.setShirtNumber(regPlayer.getShirtNumber());
+            ps.setPrimaryPosition(regPlayer.getPosition());
             ps.setTeamSeason(seasonTeam);
             playerSeasonRepository.save(ps);
         }

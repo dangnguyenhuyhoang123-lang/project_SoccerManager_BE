@@ -3,6 +3,7 @@ package com.example.demo.entity;
 import jakarta.persistence.*;
 import lombok.Data;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Entity
@@ -55,17 +56,17 @@ public class Team extends BaseEntity{
     @OneToMany(mappedBy = "team", cascade = CascadeType.ALL)
     private List<Player> players;
 
+    @OneToMany(mappedBy = "team", cascade = CascadeType.ALL)
+    private List<Player> coaches;
+
+
 
     @OneToMany(mappedBy = "team")
     private List<SeasonTeamCoach> coachesHistory;
 
     // Quan hệ với trận đấu (2 chiều từ phía Team)
-    @OneToMany(mappedBy = "homeTeam")
-    private List<Match> homeMatches;
 
-    @OneToMany(mappedBy = "awayTeam")
-    private List<Match> awayMatches;
 
     @OneToMany(mappedBy = "team")
-    private List<SeasonTeam> participatingSeasons;
+    private List<SeasonTeam> participatingSeasons = new ArrayList<>();
 }

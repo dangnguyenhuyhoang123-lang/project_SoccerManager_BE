@@ -18,12 +18,12 @@ public class StandingController {
         this.standingService = standingService;
     }
 
-    @GetMapping
+    @GetMapping("/getStandingBySeason")
     public List<StandingResponse> getStandings(@RequestParam(required = false) Long seasonId) {
         return standingService.getStandings(seasonId);
     }
 
-    @GetMapping("/{id}")
+    @GetMapping("/getStanding/{id}")
     public StandingResponse getStanding(@PathVariable Long id) {
         return standingService.getStanding(id);
     }

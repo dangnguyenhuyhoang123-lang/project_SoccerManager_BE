@@ -6,12 +6,13 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
-import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.Customizer;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -30,7 +31,6 @@ public class SecurityConfiguration {
     public DaoAuthenticationProvider authenticationProvider(MyUserServiceImpl userService) {
         DaoAuthenticationProvider dap = new DaoAuthenticationProvider(userService);
         dap.setPasswordEncoder(passwordEncoder());
-
         return dap;
     }
 
@@ -42,7 +42,11 @@ public class SecurityConfiguration {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("http://localhost:5173"));
+        configuration.setAllowedOriginPatterns(List.of(
+                "http://localhost:5173",
+                "https://*.ngrok-free.dev",
+                "https://*.ngrok-free.app"
+        ));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
@@ -52,86 +56,119 @@ public class SecurityConfiguration {
         return source;
     }
 
-//    @Bean
-//    public SecurityFilterChain securityFilterChain(HttpSecurity http,
-//                                                   DaoAuthenticationProvider authenticationProvider) throws Exception {
-//
-//        http
-//                .csrf(csrf -> csrf.disable())
-//                .cors(Customizer.withDefaults())
-//                .authenticationProvider(authenticationProvider)
-//                .authorizeHttpRequests(auth -> {
-//
-//                    auth.requestMatchers(
-//                                    "/api/user-account/login",
-//                                    "/api/user-account/register"
-//                            ).permitAll()
-//                            .requestMatchers(HttpMethod.GET, "/api/user-account/me").authenticated();
-//
-//                    auth.requestMatchers(HttpMethod.GET,
-//                            "/api/matches/**",
-//                            "/api/player/**"
-//                    ).permitAll();
-//
-//                    auth.requestMatchers("/api/user-account")
-//                            .hasRole("ADMIN");
-//
-//                    auth.anyRequest().authenticated();
-//                });
-//
-//        return http.build();
-//    }
+    @Bean
+    public SecurityFilterChain filterChain(HttpSecurity http,
+                                           DaoAuthenticationProvider authenticationProvider) throws Exception {
+        http
+                .csrf(AbstractHttpConfigurer::disable)
+                .cors(Customizer.withDefaults())
+                .authenticationProvider(authenticationProvider)
+                .authorizeHttpRequests(auth -> auth
+                        // Auth
+                        .requestMatchers(
+                                "/api/user-account/login",
+                                "/api/user-account/register"
+                        ).permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/user-account/me").authenticated()
+                        .requestMatchers(HttpMethod.GET, "/api/user-account").hasRole("ADMIN")
+
+                        // Public read APIs for website pages
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/leagues/**",
+                                "/api/seasons/**",
+                                "/api/rounds/**",
+                                "/api/teams/**",
+                                "/api/stadiums/**",
+                                "/api/matches/**",
+                                "/api/standings/**",
+                                "/api/player/getPlayer/**",
+                                "/api/player/getAllPlayers",
+                                "/api/coaches/**",
+                                "/api/lineups/**",
+                                "/api/news/**"
+                        ).permitAll()
+
+                        // Registration workflow
+                        .requestMatchers(HttpMethod.POST, "/api/registrations").hasAnyRole("ADMIN", "CLUB_MANAGER")
+
+                        .requestMatchers(HttpMethod.GET, "/api/registrations/**").hasAnyRole("ADMIN", "CLUB_MANAGER")
+
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/registrations/*/approve",
+                                "/api/registrations/*/reject"
+                        ).hasRole("ADMIN")
+
+                        // Admin only management
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/leagues/**",
+                                "/api/seasons/**",
+                                "/api/rounds/**",
+                                "/api/system-rules/**",
+                                "/api/season-teams/**",
+                                "/api/player-seasons/PlayerSeason",
+                                "/api/matches/addMatch"
+                        ).hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.PUT,
+                                "/api/leagues/**",
+                                "/api/seasons/**",
+                                "/api/rounds/**",
+                                "/api/system-rules/**",
+                                "/api/season-teams/**",
+                                "/api/player-seasons/updatePlayerSeason/**",
+                                "/api/matches/updateMatch/**"
+                        ).hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE,
+                                "/api/leagues/**",
+                                "/api/seasons/**",
+                                "/api/rounds/**",
+                                "/api/system-rules/**",
+                                "/api/season-teams/**",
+                                "/api/player-seasons/deletePlayerSeason/**",
+                                "/api/matches/deleteMatch/**"
+                        ).hasRole("ADMIN")
+
+                        // Admin and club manager shared management
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/teams/**",
+                                "/api/stadiums/**",
+                                "/api/coaches/**",
+                                "/api/player/addPlayer",
+                                "/api/season-team-coaches/**",
+                                "/api/lineups/submit"
+                        ).hasAnyRole("ADMIN", "CLUB_MANAGER")
+
+                        .requestMatchers(HttpMethod.PUT,
+                                "/api/teams/**",
+                                "/api/stadiums/**",
+                                "/api/coaches/**",
+                                "/api/player/updatePlayer/**",
+                                "/api/season-team-coaches/**"
+                        ).hasAnyRole("ADMIN", "CLUB_MANAGER")
+
+                        .requestMatchers(HttpMethod.DELETE,
+                                "/api/teams/**",
+                                "/api/stadiums/**",
+                                "/api/coaches/**",
+                                "/api/player/deletePlayer/**",
+                                "/api/season-team-coaches/**",
+                                "/api/lineups/match/**"
+                        ).hasAnyRole("ADMIN", "CLUB_MANAGER")
+
+                        // Club workspace read APIs
+                        .requestMatchers(HttpMethod.GET,
+                                "/api/season-teams",
+                                "/api/season-team-coaches/**",
+                                "/api/player-seasons/**",
+                                "/api/player/getPlayersByTeam/**"
+                        ).hasAnyRole("ADMIN", "CLUB_MANAGER")
+
+                        .anyRequest().authenticated()
+                )
+                .httpBasic(AbstractHttpConfigurer::disable)
+                .formLogin(AbstractHttpConfigurer::disable);
 
 
 
-//    @Bean
-//    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-//        http.csrf(csrf -> csrf.disable())
-//                .authorizeHttpRequests(auth -> auth
-//                        // -------------------------------------------------------------
-//                        // NHÓM 1: PUBLIC - Ai cũng xem được (STT: 4, 5, 6, 7)
-//                        // Khán giả/Khách không cần đăng nhập vẫn gọi được
-//                        // -------------------------------------------------------------
-//                        .requestMatchers(HttpMethod.GET, "/api/players/**", "/api/clubs/**",
-//                                "/api/matches/**", "/api/standings/**").permitAll()
-//
-//                        // -------------------------------------------------------------
-//                        // NHÓM 2: DÙNG CHUNG ADMIN & TRỌNG TÀI (STT: 3)
-//                        // Ghi nhận kết quả trận đấu
-//                        // -------------------------------------------------------------
-//                        .requestMatchers(HttpMethod.POST, "/api/matches/*/results").hasAnyRole("ADMIN", "REFEREE")
-//                        .requestMatchers(HttpMethod.PUT, "/api/matches/*/results").hasAnyRole("ADMIN", "REFEREE")
-//
-//                        // -------------------------------------------------------------
-//                        // NHÓM 3: DÙNG CHUNG ADMIN & QUẢN LÝ CLB (STT: 11, 12, 13)
-//                        // Quản lý CLB, Cầu thủ, Sân bãi
-//                        // -------------------------------------------------------------
-//                        .requestMatchers("/api/management/clubs/**",
-//                                "/api/management/players/**",
-//                                "/api/management/stadiums/**").hasAnyRole("ADMIN", "CLUB_MANAGER")
-//
-//                        // -------------------------------------------------------------
-//                        // NHÓM 4: CHỈ DÀNH RIÊNG CHO ADMIN (STT: 1, 2, 8, 9, 10, 14)
-//                        // Quản lý giải, Vòng đấu, Xếp lịch, Đổi luật, Duyệt hồ sơ
-//                        // -------------------------------------------------------------
-//                        .requestMatchers("/api/admin/**",
-//                                "/api/tournaments/**",
-//                                "/api/rules/**",
-//                                "/api/registrations/**").hasRole("ADMIN")
-//
-//                        .anyRequest().authenticated()
-//                );
-//        return http.build();
-//    }
-@Bean
-public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-    http
-            .csrf(csrf -> csrf.disable())
-            .cors(Customizer.withDefaults())
-            .authorizeHttpRequests(auth -> auth
-                    .anyRequest().permitAll() // 🔥 mở toàn bộ
-            );
-
-    return http.build();
-}
+        return http.build();
+    }
 }

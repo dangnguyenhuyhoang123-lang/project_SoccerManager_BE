@@ -135,7 +135,8 @@ public class UserService {
                 user.getUserName(),
                 user.getDisplayName(),
                 user.getStatus(),
-                user.getRoles().stream().map(role -> role.getRoleName()).toList()
+                user.getRoles().stream().map(role -> role.getRoleName()).toList(),
+                user.getTeam().getId()
         );
     }
 }

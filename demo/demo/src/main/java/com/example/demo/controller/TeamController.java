@@ -17,7 +17,7 @@ public class TeamController {
         this.teamService = teamService;
     }
 
-    @GetMapping
+    @GetMapping("/getAllTeams")
     public Page<TeamResponse> getTeams(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -28,22 +28,22 @@ public class TeamController {
         return teamService.getTeams(page, size, search, city, seasonId);
     }
 
-    @GetMapping("/{id}")
+    @GetMapping("/getTeam/{id}")
     public TeamResponse getTeam(@PathVariable Long id) {
         return teamService.getTeam(id);
     }
 
-    @PostMapping
+    @PostMapping("/addTeam")
     public TeamResponse createTeam(@RequestBody TeamRequest request) {
         return teamService.create(request);
     }
 
-    @PutMapping("/{id}")
+    @PutMapping("/updateTeam/{id}")
     public TeamResponse updateTeam(@PathVariable Long id, @RequestBody TeamRequest request) {
         return teamService.update(id, request);
     }
 
-    @DeleteMapping("/{id}")
+    @DeleteMapping("/deleteTeam/{id}")
     public void deleteTeam(@PathVariable Long id) {
         teamService.delete(id);
     }

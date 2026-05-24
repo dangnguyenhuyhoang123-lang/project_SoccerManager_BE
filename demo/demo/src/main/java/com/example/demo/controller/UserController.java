@@ -52,7 +52,8 @@ public class UserController {
                 user.getRoles()
                         .stream()
                         .map(role -> role.getRoleName())
-                        .toList()
+                        .toList(),
+                user.getTeam().getId()
         );
     }
 

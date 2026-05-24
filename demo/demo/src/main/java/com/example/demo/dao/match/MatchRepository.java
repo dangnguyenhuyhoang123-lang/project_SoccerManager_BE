@@ -1,6 +1,7 @@
 package com.example.demo.dao.match;
 
 import com.example.demo.entity.Match;
+import com.example.demo.entity.MatchStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -17,23 +18,23 @@ public interface MatchRepository extends JpaRepository<Match,Long> {
 
 
 
-    @EntityGraph(attributePaths = {"homeTeam", "awayTeam", "season"})
+    @EntityGraph(attributePaths = {"homeTeam", "homeTeam.team", "homeTeam.team.stadium", "awayTeam", "awayTeam.team", "awayTeam.team.stadium", "season", "season.league", "stadium", "round"})
     Page<Match> findAll(Pageable pageable);
 
 
-    @EntityGraph(attributePaths = {"homeTeam", "awayTeam", "season"})
+    @EntityGraph(attributePaths = {"homeTeam", "homeTeam.team", "homeTeam.team.stadium", "awayTeam", "awayTeam.team", "awayTeam.team.stadium", "season", "season.league", "stadium", "round"})
     @Query("""
     SELECT m FROM Match m
     WHERE 
         (:status IS NULL OR m.status = :status)
     AND
         (:search IS NULL OR :search = '' OR
-            LOWER(m.homeTeam.name) LIKE LOWER(CONCAT('%', :search, '%')) OR
-            LOWER(m.awayTeam.name) LIKE LOWER(CONCAT('%', :search, '%'))
+            LOWER(m.homeTeam.team.name) LIKE LOWER(CONCAT('%', :search, '%')) OR
+            LOWER(m.awayTeam.team.name) LIKE LOWER(CONCAT('%', :search, '%'))
         )
 """)
     Page<Match> filterMatches(
-            @Param("status") String status,
+            @Param("status") MatchStatus status,
             @Param("search") String search,
             Pageable pageable
     );

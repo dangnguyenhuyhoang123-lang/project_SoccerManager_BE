@@ -1,10 +1,8 @@
 package com.example.demo.dto;
 
 import com.example.demo.entity.EventType;
-import com.example.demo.entity.Match;
+import com.example.demo.entity.GoalType;
 import com.example.demo.entity.Player;
-import com.example.demo.entity.Team;
-import jakarta.persistence.*;
 import lombok.Data;
 
 
@@ -13,17 +11,20 @@ public class MatchEventDTO {
     private Long id;
     private Integer minute;
     private EventType eventType;
+    private GoalType goalType;
 
+    private Long teamId;
     private Long playerId;
     private String playerName;
 
     private Long playerInId;
     private String playerInName;
 
-    private Long playerOutId;
-    private String playerOutName;
+    private Long assistPlayerId;
+    private String assistPlayerName;
 
     private String teamName;
 
+    private String note;
     private String description;
 }

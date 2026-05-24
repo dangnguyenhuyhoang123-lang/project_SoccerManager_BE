@@ -1,7 +1,7 @@
 package com.example.demo.service;
 
 import com.example.demo.controller.SystemRuleController;
-import com.example.demo.dao.SystemRuleRepo;
+import com.example.demo.dao.SystemRuleRepository;
 import com.example.demo.entity.SystemRule;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -12,15 +12,15 @@ import org.springframework.stereotype.Service;
 @Service
 public class SystemRuleService {
 
-    private final SystemRuleRepo systemRuleRepo;
+    private final SystemRuleRepository systemRuleRepository;
 
     @Autowired
-    public SystemRuleService(SystemRuleRepo systemRuleRepo) {
-        this.systemRuleRepo = systemRuleRepo;
+    public SystemRuleService(SystemRuleRepository systemRuleRepository) {
+        this.systemRuleRepository = systemRuleRepository;
     }
 
     public Page<SystemRuleController.SystemRuleResponse> getSystemRules(int page, int size) {
-        return systemRuleRepo.findAll(PageRequest.of(page, Math.min(size, 100)))
+        return systemRuleRepository.findAll(PageRequest.of(page, Math.min(size, 100)))
                 .map(this::toResponse);
     }
 
@@ -31,24 +31,24 @@ public class SystemRuleService {
     public SystemRuleController.SystemRuleResponse create(SystemRuleController.SystemRuleRequest request) {
         SystemRule systemRule = new SystemRule();
         applyRequest(systemRule, request);
-        return toResponse(systemRuleRepo.save(systemRule));
+        return toResponse(systemRuleRepository.save(systemRule));
     }
 
     public SystemRuleController.SystemRuleResponse update(Long id, SystemRuleController.SystemRuleRequest request) {
         SystemRule systemRule = findEntity(id);
         applyRequest(systemRule, request);
-        return toResponse(systemRuleRepo.save(systemRule));
+        return toResponse(systemRuleRepository.save(systemRule));
     }
 
     public void delete(Long id) {
-        if (!systemRuleRepo.existsById(id)) {
+        if (!systemRuleRepository.existsById(id)) {
             throw new ResourceNotFoundException("System rule not found with id = " + id);
         }
-        systemRuleRepo.deleteById(id);
+        systemRuleRepository.deleteById(id);
     }
 
     private SystemRule findEntity(Long id) {
-        return systemRuleRepo.findById(id)
+        return systemRuleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("System rule not found with id = " + id));
     }
 

@@ -17,7 +17,7 @@ public class LeagueController {
         this.leagueService = leagueService;
     }
 
-    @GetMapping
+    @GetMapping("/getAllLeagues")
     public Page<LeagueResponse> getLeagues(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size,
@@ -26,27 +26,27 @@ public class LeagueController {
         return leagueService.getLeagues(page, size, search);
     }
 
-    @GetMapping("/{id}")
+    @GetMapping("/getLeague/{id}")
     public LeagueResponse getLeague(@PathVariable Long id) {
         return leagueService.getLeague(id);
     }
 
-    @GetMapping("/{id}/seasons")
+    @GetMapping("/getLeagueSeasons/{id}/seasons")
     public java.util.List<SeasonResponse> getLeagueSeasons(@PathVariable Long id) {
         return leagueService.getLeagueSeasons(id);
     }
 
-    @PostMapping
+    @PostMapping("/addLeague")
     public LeagueResponse createLeague(@RequestBody LeagueRequest request) {
         return leagueService.create(request);
     }
 
-    @PutMapping("/{id}")
+    @PutMapping("/updateLeague/{id}")
     public LeagueResponse updateLeague(@PathVariable Long id, @RequestBody LeagueRequest request) {
         return leagueService.update(id, request);
     }
 
-    @DeleteMapping("/{id}")
+    @DeleteMapping("/deleteLeague/{id}")
     public void deleteLeague(@PathVariable Long id) {
         leagueService.delete(id);
     }

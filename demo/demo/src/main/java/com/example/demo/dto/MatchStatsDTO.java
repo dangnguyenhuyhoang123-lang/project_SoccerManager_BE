@@ -1,6 +1,19 @@
 package com.example.demo.dto;
 
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@AllArgsConstructor
+@NoArgsConstructor
 public class MatchStatsDTO {
+    public Long matchId;
+    public Long homeTeamId;
+    public String homeTeamName;
+    public Long awayTeamId;
+    public String awayTeamName;
+
     public Integer shotsHome;
     public Integer shotsAway;
 
@@ -24,4 +37,10 @@ public class MatchStatsDTO {
 
     public Integer redCardsHome;
     public Integer redCardsAway;
+
+    public Integer totalPassesHome;
+    public Integer totalPassesAway;
+
+    public Float passAccuracyHome;
+    public Float passAccuracyAway;
 }

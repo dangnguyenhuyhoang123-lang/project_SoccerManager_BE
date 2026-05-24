@@ -1,7 +1,7 @@
 package com.example.demo.service;
 
 import com.example.demo.controller.TeamController;
-import com.example.demo.dao.StadiumRepo;
+import com.example.demo.dao.StadiumRepository;
 import com.example.demo.dao.season.SeasonTeamRepository;
 import com.example.demo.dao.team.TeamRepository;
 import com.example.demo.entity.SeasonTeam;
@@ -22,13 +22,13 @@ import java.util.List;
 public class TeamService {
 
     private final TeamRepository teamRepository;
-    private final StadiumRepo stadiumRepo;
+    private final StadiumRepository stadiumRepository;
     private final SeasonTeamRepository seasonTeamRepository;
 
     @Autowired
-    public TeamService(TeamRepository teamRepository, StadiumRepo stadiumRepo, SeasonTeamRepository seasonTeamRepository) {
+    public TeamService(TeamRepository teamRepository, StadiumRepository stadiumRepository, SeasonTeamRepository seasonTeamRepository) {
         this.teamRepository = teamRepository;
-        this.stadiumRepo = stadiumRepo;
+        this.stadiumRepository = stadiumRepository;
         this.seasonTeamRepository = seasonTeamRepository;
     }
 
@@ -88,7 +88,7 @@ public class TeamService {
     }
 
     private void applyRequest(Team team, TeamController.TeamRequest request) {
-        Stadium stadium = request.stadiumId() == null ? null : stadiumRepo.findById(request.stadiumId())
+        Stadium stadium = request.stadiumId() == null ? null : stadiumRepository.findById(request.stadiumId())
                 .orElseThrow(() -> new ResourceNotFoundException("Stadium not found with id = " + request.stadiumId()));
 
         team.setName(request.name());

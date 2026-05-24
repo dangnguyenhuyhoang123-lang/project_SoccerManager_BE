@@ -50,11 +50,11 @@ public class Match {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "home_team", nullable = false)
-    private Team homeTeam;
+    private SeasonTeam homeTeam;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "away_team", nullable = false)
-    private Team awayTeam;
+    private SeasonTeam awayTeam;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "round_id", nullable = false)

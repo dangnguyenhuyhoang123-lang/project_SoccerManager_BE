@@ -38,6 +38,9 @@ public class Coach extends BaseEntity{
     @Column
     private String status;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "team_id")
+    private Team team;
 
     // Xem sự nghiệp của HLV này đã qua những đội bóng nào
     @OneToMany(mappedBy = "coach")

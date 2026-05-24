@@ -2,7 +2,7 @@ package com.example.demo.service;
 
 import com.example.demo.controller.SeasonController;
 import com.example.demo.dao.LeagueRepository;
-import com.example.demo.dao.SystemRuleRepo;
+import com.example.demo.dao.SystemRuleRepository;
 import com.example.demo.dao.season.SeasonRepository;
 import com.example.demo.dao.season.SeasonTeamRepository;
 import com.example.demo.entity.League;
@@ -26,17 +26,17 @@ public class SeasonService {
 
     private final SeasonRepository seasonRepository;
     private final LeagueRepository leagueRepository;
-    private final SystemRuleRepo systemRuleRepo;
+    private final SystemRuleRepository systemRuleRepository;
     private final SeasonTeamRepository seasonTeamRepository;
 
     @Autowired
     public SeasonService(SeasonRepository seasonRepository,
                          LeagueRepository leagueRepository,
-                         SystemRuleRepo systemRuleRepo,
+                         SystemRuleRepository systemRuleRepository,
                          SeasonTeamRepository seasonTeamRepository) {
         this.seasonRepository = seasonRepository;
         this.leagueRepository = leagueRepository;
-        this.systemRuleRepo = systemRuleRepo;
+        this.systemRuleRepository = systemRuleRepository;
         this.seasonTeamRepository = seasonTeamRepository;
     }
 
@@ -91,7 +91,7 @@ public class SeasonService {
     private void applySeasonRequest(Season season, SeasonController.SeasonRequest request) {
         League league = request.leagueId() == null ? null : leagueRepository.findById(request.leagueId())
                 .orElseThrow(() -> new ResourceNotFoundException("League not found with id = " + request.leagueId()));
-        SystemRule systemRule = request.systemRuleId() == null ? null : systemRuleRepo.findById(request.systemRuleId())
+        SystemRule systemRule = request.systemRuleId() == null ? null : systemRuleRepository.findById(request.systemRuleId())
                 .orElseThrow(() -> new ResourceNotFoundException("System rule not found with id = " + request.systemRuleId()));
 
         season.setYear(request.year());

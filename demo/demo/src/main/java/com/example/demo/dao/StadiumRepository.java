@@ -8,7 +8,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface StadiumRepo extends JpaRepository<Stadium, Long> {
+public interface StadiumRepository extends JpaRepository<Stadium, Long> {
     Optional<Stadium> findByNameIgnoreCaseAndAddressIgnoreCase(String name, String address);
 
     List<Stadium> findByNameContainingIgnoreCase(String name);

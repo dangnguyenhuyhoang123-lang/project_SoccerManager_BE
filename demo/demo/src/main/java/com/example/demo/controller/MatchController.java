@@ -1,11 +1,7 @@
 package com.example.demo.controller;
 
-import com.example.demo.dto.LineUpDTO;
 import com.example.demo.dto.MatchDTO;
-import com.example.demo.dto.MatchEventDTO;
-import com.example.demo.dto.MatchStatsDTO;
-import com.example.demo.entity.Match;
-import com.example.demo.entity.Player;
+import com.example.demo.dto.MatchUpsertDTO;
 import com.example.demo.service.MatchService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -13,10 +9,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Sort;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
-
-import static org.springframework.util.StringUtils.hasText;
 
 @RestController
 @RequestMapping("/api/matches")
@@ -133,13 +125,13 @@ public class MatchController {
     }
 
     @PostMapping("/addMatch")
-    public Match addMatch(@RequestBody Match match)
+    public MatchDTO addMatch(@RequestBody MatchUpsertDTO match)
     {
         return matchService.save(match);
     }
 
     @PutMapping("/updateMatch/{id}")
-    public Match updateMatch(@PathVariable Long id, @RequestBody Match match)
+    public MatchDTO updateMatch(@PathVariable Long id, @RequestBody MatchUpsertDTO match)
     {
         return matchService.update(id,match);
     }

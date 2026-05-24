@@ -22,12 +22,12 @@ public class RegistrationController {
     private final RegistrationService registrationService;
     private final AdminApprovalService adminApprovalService;
 
-    @PostMapping
+    @PostMapping("/submit")
     public ResponseEntity<RegistrationSummaryDTO> submitRegistration(@RequestBody FullRegistrationDTO dto) {
         return ResponseEntity.ok(registrationService.submitRegistration(dto));
     }
 
-    @GetMapping
+    @GetMapping("/getRegistrations")
     public List<RegistrationSummaryDTO> getRegistrations(@RequestParam(required = false) RegistrationStatus status) {
         return registrationService.getRegistrations(status);
     }

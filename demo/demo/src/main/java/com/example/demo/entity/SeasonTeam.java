@@ -5,7 +5,8 @@ import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-
+import java.util.ArrayList;
+import java.util.List;
 @Entity
 @Table(
         name = "season_team",
@@ -41,7 +42,11 @@ public class SeasonTeam extends  BaseEntity{
     @JoinColumn(name = "registration_id", unique = true)
     private RegistrationTeam registrationTeam;
 
+    @OneToMany(mappedBy = "homeTeam")
+    private List<Match> homeMatches;
 
+    @OneToMany(mappedBy = "awayTeam")
+    private List<Match> awayMatches;
 
     @Column
     private String notes;
