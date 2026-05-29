@@ -7,7 +7,14 @@ import lombok.Data;
 @Data
 @Table(
         name = "player_stats",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"player_id", "season_id"})
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_player_stats_player_season",
+                columnNames = {"player_id", "season_id"}
+        ),
+        indexes = {
+                @Index(name = "idx_player_stats_season", columnList = "season_id"),
+                @Index(name = "idx_player_stats_player", columnList = "player_id")
+        }
 )
 public class PlayerStats {
     @Id
@@ -33,10 +40,10 @@ public class PlayerStats {
     private Integer redCards = 0;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "player_id")
+    @JoinColumn(name = "player_id", nullable = false)
     private Player player;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "season_id")
+    @JoinColumn(name = "season_id", nullable = false)
     private Season season;
 }

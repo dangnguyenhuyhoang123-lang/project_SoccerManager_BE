@@ -2,14 +2,16 @@ package com.example.demo.controller;
 
 
 import com.example.demo.dto.LoginRequest;
-import com.example.demo.dto.UserDTO;
+import com.example.demo.dto.user.*;
 import com.example.demo.entity.user.User;
 import jakarta.servlet.http.HttpServletRequest;
 import com.example.demo.service.user.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
@@ -42,18 +44,20 @@ public class UserController {
 
         User user = userService.findByUserName(username);
 
+        Long teamId = user.getTeam() != null ? user.getTeam().getId() : null;
         return new UserDTO(
                 user.getId(),
                 user.getFullName(),
                 user.getEmail(),
                 user.getUserName(),
                 user.getDisplayName(),
+                user.getAvatar(),
                 user.getStatus(),
                 user.getRoles()
                         .stream()
                         .map(role -> role.getRoleName())
                         .toList(),
-                user.getTeam().getId()
+                teamId
         );
     }
 
@@ -67,4 +71,46 @@ public class UserController {
     }
 
 
+    @PostMapping("/createUser")
+    public ResponseEntity<?> createUser(@RequestBody CreateUserRequest request) {
+        return userService.createUser(request);
+    }
+
+    @PutMapping("/{userId}/info")
+    public ResponseEntity<UserDTO> updateUserInfo(
+            @PathVariable Long userId,
+            @RequestBody UpdateUserInfoRequest request
+    ) {
+        return ResponseEntity.ok(userService.updateUserInfo(userId, request));
+    }
+
+    @PutMapping("/{userId}/roles")
+    public ResponseEntity<UserDTO> updateUserRoles(
+            @PathVariable Long userId,
+            @RequestBody UpdateUserRolesRequest request
+    ) {
+        return ResponseEntity.ok(
+                userService.updateUserRoles(
+                        userId,
+                        request.getRoles(),
+                        request.getTeamId()
+                )
+        );
+    }
+
+    @PutMapping("/{userId}/status")
+    public ResponseEntity<UserDTO> updateUserStatus(
+            @PathVariable Long userId,
+            @RequestBody UpdateUserStatusRequest request
+    ) {
+        return ResponseEntity.ok(
+                userService.updateUserStatus(userId, request.getStatus())
+        );
+    }
+
+    @DeleteMapping("/{userId}")
+    public ResponseEntity<?> deleteUser(@PathVariable Long userId) {
+        userService.deleteUser(userId);
+        return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+    }
 }

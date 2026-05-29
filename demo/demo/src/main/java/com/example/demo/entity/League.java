@@ -31,4 +31,14 @@ public class League extends  BaseEntity {
 
     @OneToMany(mappedBy = "league", cascade = CascadeType.ALL)
     private List<Season> seasons;
+
+
+    @Column(name = "vpf_league_slug", length = 255)
+    private String vpfLeagueSlug;
+
+    @Column(name = "sportsdb_league_id", length = 100)
+    private String sportsDbLeagueId;
+
+    @Column(name = "source_name", length = 100)
+    private String sourceName;
 }

@@ -1,6 +1,6 @@
 package com.example.demo.Sheduler;
 
-import com.example.demo.service.VffNewsCrawlerService;
+import com.example.demo.service.crawl.VffNewsCrawlerService;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 

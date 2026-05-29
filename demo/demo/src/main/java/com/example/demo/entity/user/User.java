@@ -63,4 +63,8 @@ public class User {
     )
     private Set<Role> roles = new HashSet<>();
 
+    @Column(columnDefinition = "LONGTEXT")
+    @Lob
+    private String avatar;
+
 }

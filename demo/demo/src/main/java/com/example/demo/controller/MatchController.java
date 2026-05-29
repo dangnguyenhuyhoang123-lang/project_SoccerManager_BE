@@ -1,14 +1,16 @@
 package com.example.demo.controller;
 
-import com.example.demo.dto.MatchDTO;
-import com.example.demo.dto.MatchUpsertDTO;
+import com.example.demo.dto.*;
 import com.example.demo.service.MatchService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/matches")
@@ -124,6 +126,14 @@ public class MatchController {
         );
     }
 
+    @GetMapping("/{id}")
+    public MatchDTO getMatchById(@PathVariable Long id) {
+        return matchService.getMatchById(id);
+    }
+
+
+
+
     @PostMapping("/addMatch")
     public MatchDTO addMatch(@RequestBody MatchUpsertDTO match)
     {
@@ -136,11 +146,28 @@ public class MatchController {
         return matchService.update(id,match);
     }
 
+    @PatchMapping("/{id}/status")
+    public MatchDTO updateMatchStatus(
+            @PathVariable Long id,
+            @RequestBody MatchStatusUpdateDTO request
+    ) {
+        return matchService.updateStatus(id, request);
+    }
+
     @DeleteMapping("/deleteMatch/{id}")
     public void deleteMatch(@PathVariable Long id)
     {
         matchService.delete(id);
     }
 
+    @GetMapping("/{matchId}/teams/{teamId}/team-season")
+    public ResponseEntity<MatchTeamSeasonDTO> getTeamSeasonByMatchAndTeam(
+            @PathVariable Long matchId,
+            @PathVariable Long teamId
+    ) {
+        return ResponseEntity.ok(
+                matchService.getTeamSeasonByMatchAndTeam(matchId, teamId)
+        );
+    }
 
 }

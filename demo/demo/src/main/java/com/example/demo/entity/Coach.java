@@ -45,4 +45,10 @@ public class Coach extends BaseEntity{
     // Xem sự nghiệp của HLV này đã qua những đội bóng nào
     @OneToMany(mappedBy = "coach")
     private List<SeasonTeamCoach> careerHistory;
+
+    @Column(name = "normalized_name")
+    private String normalizedName;
+
+    @Column(name = "source_name")
+    private String sourceName;
 }

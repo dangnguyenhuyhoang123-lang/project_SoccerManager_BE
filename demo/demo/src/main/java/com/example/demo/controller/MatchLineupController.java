@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/api/lineups")
+@RequestMapping("/api/matches")
 @CrossOrigin
 public class MatchLineupController {
 

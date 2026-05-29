@@ -59,4 +59,7 @@ public class PlayerSeason {
 
     @Column(name = "contract_end")
     private Date contractEnd;
+
+    @Column(nullable = false)
+    private String status;
 }

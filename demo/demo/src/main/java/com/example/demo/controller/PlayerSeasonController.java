@@ -77,6 +77,7 @@ public class PlayerSeasonController {
             Long id,
             Long playerId,
             String playerName,
+            String avatar,
             Long teamId,
             String teamName,
             Long seasonId,

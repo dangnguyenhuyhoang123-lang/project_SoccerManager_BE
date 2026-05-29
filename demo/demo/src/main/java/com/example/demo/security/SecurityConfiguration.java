@@ -47,7 +47,7 @@ public class SecurityConfiguration {
                 "https://*.ngrok-free.dev",
                 "https://*.ngrok-free.app"
         ));
-        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedMethods(List.of("GET", "POST","PATCH", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
 
@@ -64,13 +64,32 @@ public class SecurityConfiguration {
                 .cors(Customizer.withDefaults())
                 .authenticationProvider(authenticationProvider)
                 .authorizeHttpRequests(auth -> auth
+
+                                .requestMatchers("/ws/**").permitAll()
                         // Auth
                         .requestMatchers(
                                 "/api/user-account/login",
                                 "/api/user-account/register"
                         ).permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/user-account/me").authenticated()
-                        .requestMatchers(HttpMethod.GET, "/api/user-account").hasRole("ADMIN")
+
+                                .requestMatchers(HttpMethod.PUT, "/api/user-account/*/info").permitAll()
+
+                        .requestMatchers("/api/user-account/me").authenticated()
+                        .requestMatchers("/api/user-account/**").hasRole("ADMIN")
+
+
+                        // Crawler dev endpoints
+                        .requestMatchers(
+                                "/api/vleague/sync/**",
+                                "/error",
+                                "/api/standings/**"
+                                ,"/api/team-stats/**",
+                                "/api/matches/**",
+                                "/api/player-stats/**"
+                        ).permitAll()
+
+//                        .requestMatchers(HttpMethod.GET, "/api/user-account/me").authenticated()
+//                        .requestMatchers(HttpMethod.GET, "/api/user-account").hasRole("ADMIN")
 
                         // Public read APIs for website pages
                         .requestMatchers(HttpMethod.GET,
@@ -85,7 +104,14 @@ public class SecurityConfiguration {
                                 "/api/player/getAllPlayers",
                                 "/api/coaches/**",
                                 "/api/lineups/**",
-                                "/api/news/**"
+                                "/api/news/**",
+                                "/api/vleague/**",
+                                "/api/vleague/sync/**",
+                                "/api/vleague/sync/vpf-calendar/preview",
+                                "/api/vleague/sync/vpf-calendar",
+                                "/api/player-seasons/**",
+                                "/api/system-rules/**"
+
                         ).permitAll()
 
                         // Registration workflow
@@ -97,6 +123,7 @@ public class SecurityConfiguration {
                                 "/api/registrations/*/approve",
                                 "/api/registrations/*/reject"
                         ).hasRole("ADMIN")
+
 
                         // Admin only management
                         .requestMatchers(HttpMethod.POST,
@@ -124,8 +151,11 @@ public class SecurityConfiguration {
                                 "/api/system-rules/**",
                                 "/api/season-teams/**",
                                 "/api/player-seasons/deletePlayerSeason/**",
-                                "/api/matches/deleteMatch/**"
+                                "/api/matches/deleteMatch/**",
+                                "/api/vleague/sync/**"
                         ).hasRole("ADMIN")
+
+                        .requestMatchers(HttpMethod.PATCH, "/api/matches/*/status").hasRole("ADMIN")
 
                         // Admin and club manager shared management
                         .requestMatchers(HttpMethod.POST,
@@ -161,6 +191,11 @@ public class SecurityConfiguration {
                                 "/api/player-seasons/**",
                                 "/api/player/getPlayersByTeam/**"
                         ).hasAnyRole("ADMIN", "CLUB_MANAGER")
+//                        system rule
+                                .requestMatchers(HttpMethod.GET, "/api/system-rules/**").authenticated()
+                                .requestMatchers(HttpMethod.POST, "/api/system-rules/**").hasRole("ADMIN")
+                                .requestMatchers(HttpMethod.PUT, "/api/system-rules/**").hasRole("ADMIN")
+                                .requestMatchers(HttpMethod.DELETE, "/api/system-rules/**").hasRole("ADMIN")
 
                         .anyRequest().authenticated()
                 )

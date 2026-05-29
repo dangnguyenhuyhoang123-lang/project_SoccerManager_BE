@@ -7,4 +7,7 @@ import org.springframework.stereotype.Repository;
 
 @Repository
 public interface SystemRuleRepository extends JpaRepository<SystemRule,Long> {
+    boolean existsByRuleNameIgnoreCase(String ruleName);
+
+    boolean existsByRuleNameIgnoreCaseAndIdNot(String ruleName, Long id);
 }

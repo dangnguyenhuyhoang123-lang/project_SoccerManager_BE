@@ -9,56 +9,78 @@ import com.example.demo.dao.match.MatchStatsRepository;
 import com.example.demo.dao.season.SeasonRepository;
 import com.example.demo.dao.season.SeasonTeamRepository;
 import com.example.demo.dao.team.TeamRepository;
-import com.example.demo.dto.LeagueDTO;
-import com.example.demo.dto.MatchDTO;
-import com.example.demo.dto.MatchUpsertDTO;
-import com.example.demo.dto.RoundDTO;
-import com.example.demo.dto.SeasonDTO;
-import com.example.demo.dto.StadiumDTO;
-import com.example.demo.dto.TeamDTO;
+import com.example.demo.dao.user.UserRepository;
+import com.example.demo.dto.*;
 import com.example.demo.entity.*;
+import com.example.demo.entity.user.User;
 import jakarta.transaction.Transactional;
+import lombok.AllArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.rest.webmvc.ResourceNotFoundException;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.time.LocalDate;
+import java.util.Optional;
 
 @Service
+@AllArgsConstructor
 public class MatchService {
 
-    @Autowired
-    private MatchRepository matchRepository;
 
-    @Autowired
-    private MatchStatsRepository matchStatsRepository;
+    private final MatchRepository matchRepository;
 
-    @Autowired
-    private MatchEventRepository matchEventRepository;
 
-    @Autowired
-    private MatchLineupRepository matchLineupRepository;
+    private final MatchStatsRepository matchStatsRepository;
 
-    @Autowired
-    private TeamRepository teamRepository;
 
-    @Autowired
-    private SeasonRepository seasonRepository;
+    private final MatchEventRepository matchEventRepository;
 
-    @Autowired
-    private StadiumRepository stadiumRepository;
 
-    @Autowired
-    private RoundRepository roundRepository;
+    private final MatchLineupRepository matchLineupRepository;
 
-    @Autowired
-    private SeasonTeamRepository seasonTeamRepository;
+
+    private final TeamRepository teamRepository;
+
+
+    private final SeasonRepository seasonRepository;
+
+
+    private final StadiumRepository stadiumRepository;
+
+
+    private final RoundRepository roundRepository;
+
+
+    private final SeasonTeamRepository seasonTeamRepository;
+
+    private final StandingService standingService;
+
+    private final NotificationService notificationService;
+
+    private final UserRepository userRepository;
+
+
+
+
+//    public MatchDTO getMatchById(Long id) {
+//        Match match = matchRepository.findById(id)
+//                .orElseThrow(() -> new RuntimeException("Match not found"));
+//
+//        return toDTO(match);
+//    }
 
     public MatchDTO getMatchById(Long id) {
         Match match = matchRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Match not found"));
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND,
+                        "Không tìm thấy trận đấu id = " + id
+                ));
 
         return toDTO(match);
     }
@@ -81,6 +103,7 @@ public class MatchService {
                 .map(this::toDTO);
     }
 
+    @Transactional
     public MatchDTO save(MatchUpsertDTO request) {
         Match match = new Match();
         applyRequest(match, request);
@@ -93,14 +116,108 @@ public class MatchService {
             match.setStatus(MatchStatus.SCHEDULED);
         }
 
-        if (match.getHomeScore() == null) {
-            match.setHomeScore(-1);
-        }
-        if (match.getAwayScore() == null) {
-            match.setAwayScore(-1);
+        if (match.getStatus() == MatchStatus.SCHEDULED) {
+            match.setHomeScore(null);
+            match.setAwayScore(null);
         }
 
-        return toDTO(matchRepository.save(match));
+        Match savedMatch = matchRepository.save(match);
+
+
+
+        if (savedMatch.getStatus() == MatchStatus.SCHEDULED) {
+            sendMatchCreatedNotifications(savedMatch);
+        }
+        if (savedMatch.getStatus() == MatchStatus.FINISHED) {
+            standingService.recalculateBySeason(savedMatch.getSeason().getId());
+        }
+
+        return toDTO(savedMatch);
+    }
+
+    private void sendMatchCreatedNotifications(Match match) {
+        if (match == null) {
+            return;
+        }
+
+        SeasonTeam homeSeasonTeam = match.getHomeTeam();
+        SeasonTeam awaySeasonTeam = match.getAwayTeam();
+
+
+
+        String matchName = buildMatchName(match);
+
+        notifyClubManager(homeSeasonTeam, match, matchName);
+        notifyClubManager(awaySeasonTeam, match, matchName);
+    }
+
+    private String buildMatchName(Match match) {
+        String homeName = match.getHomeTeam() != null
+                && match.getHomeTeam().getTeam() != null
+                ? match.getHomeTeam().getTeam().getName()
+                : "Đội chủ nhà";
+
+        String awayName = match.getAwayTeam() != null
+                && match.getAwayTeam().getTeam() != null
+                ? match.getAwayTeam().getTeam().getName()
+                : "Đội khách";
+
+        return homeName + " vs " + awayName;
+    }
+
+    private void notifyClubManager(SeasonTeam seasonTeam, Match match, String matchName) {
+        if (seasonTeam == null || seasonTeam.getTeam() == null) {
+            return;
+        }
+
+        Team team = seasonTeam.getTeam();
+
+    /*
+      Chỗ này bạn cần chỉnh theo model thật của bạn.
+      Nếu Team có manager/user:
+          Long managerUserId = team.getManager().getId();
+
+      Nếu User có teamId:
+          cần query UserRepository tìm user theo teamId + role CLUB_MANAGER.
+
+      Tạm thời mình để dạng TODO để bạn map đúng entity hiện tại.
+    */
+
+
+
+        Optional<User> managerOpt =
+                userRepository.findClubManagerByTeamIdAndRoleName(
+                        team.getId(),
+                        "ROLE_CLUB_MANAGER"
+                );
+
+        if (managerOpt.isEmpty()) {
+            managerOpt = userRepository.findClubManagerByTeamIdAndRoleName(
+                    team.getId(),
+                    "CLUB_MANAGER"
+            );
+        }
+
+        if (managerOpt.isEmpty()) {
+            managerOpt = userRepository.findFirstByTeamId(team.getId());
+        }
+
+        Long managerUserId = managerOpt
+                .map(User::getId)
+                .orElse(null);
+
+        if (managerUserId == null) {
+            return;
+        }
+
+        notificationService.sendToUser(
+                managerUserId,
+                "Trận đấu mới được tạo",
+                "CLB của bạn có trận đấu mới: " + matchName + ". Vui lòng cập nhật đội hình thi đấu.",
+                "MATCH_CREATED",
+                match.getId(),
+                "MATCH"
+        );
     }
 
     @Transactional
@@ -108,19 +225,46 @@ public class MatchService {
         Match existing = matchRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Match not found"));
 
+        Long oldSeasonId = existing.getSeason() != null ? existing.getSeason().getId() : null;
+
         applyRequest(existing, request);
-        return toDTO(matchRepository.save(existing));
+        if (existing.getStadium() == null && existing.getHomeTeam() != null) {
+            existing.setStadium(existing.getHomeTeam().getTeam().getStadium());
+        }
+
+        Match savedMatch = matchRepository.save(existing);
+
+        Long newSeasonId = savedMatch.getSeason() != null ? savedMatch.getSeason().getId() : null;
+
+        if (oldSeasonId != null) {
+            standingService.recalculateBySeason(oldSeasonId);
+        }
+
+        if (newSeasonId != null && !newSeasonId.equals(oldSeasonId)) {
+            standingService.recalculateBySeason(newSeasonId);
+        }
+
+        return toDTO(savedMatch);
     }
 
     @Transactional
     public void delete(Long id) {
-        if (!matchRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Match not found with id = " + id);
+        Match match = matchRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Match not found with id = " + id));
+
+        Long seasonId = match.getSeason() != null ? match.getSeason().getId() : null;
+
+        matchRepository.delete(match);
+
+        if (seasonId != null) {
+            standingService.recalculateBySeason(seasonId);
         }
-        matchRepository.deleteById(id);
     }
 
     private void applyRequest(Match match, MatchUpsertDTO request) {
+
+        validateMatchRequest(request);
+
         SeasonTeam homeTeam = seasonTeamRepository.findById(request.getHomeTeamId())
                 .orElseThrow(() -> new RuntimeException("Home team not found with id = " + request.getHomeTeamId()));
         SeasonTeam awayTeam = seasonTeamRepository.findById(request.getAwayTeamId())
@@ -129,6 +273,38 @@ public class MatchService {
                 .orElseThrow(() -> new RuntimeException("Season not found with id = " + request.getSeasonId()));
         Round round = roundRepository.findById(request.getRoundId())
                 .orElseThrow(() -> new RuntimeException("Round not found with id = " + request.getRoundId()));
+
+
+
+        if (season.getSystemRule() == null) {
+            throw new RuntimeException("Mùa giải chưa được cấu hình bộ luật, không thể tạo trận đấu");
+        }
+        if (!homeTeam.getSeason().getId().equals(season.getId())) {
+            throw new RuntimeException("Đội chủ nhà không thuộc mùa giải đã chọn");
+        }
+
+        if (!awayTeam.getSeason().getId().equals(season.getId())) {
+            throw new RuntimeException("Đội khách không thuộc mùa giải đã chọn");
+        }
+        if (round.getSeason() == null || !round.getSeason().getId().equals(season.getId())) {
+            throw new RuntimeException("Vòng đấu không thuộc mùa giải đã chọn");
+        }
+
+
+        if (homeTeam.getId().equals(awayTeam.getId())) {
+            throw new RuntimeException("Đội chủ nhà và đội khách không được trùng nhau");
+        }
+        if (request.getMatchDate() != null) {
+            LocalDate matchDate = request.getMatchDate().toLocalDate();
+
+            if (season.getStartDate() != null && matchDate.isBefore(season.getStartDate())) {
+                throw new RuntimeException("Ngày thi đấu không được trước ngày bắt đầu mùa giải");
+            }
+
+            if (season.getEndDate() != null && matchDate.isAfter(season.getEndDate())) {
+                throw new RuntimeException("Ngày thi đấu không được sau ngày kết thúc mùa giải");
+            }
+        }
 
         match.setStatus(request.getStatus());
         match.setHomeScore(request.getHomeScore());
@@ -147,6 +323,84 @@ public class MatchService {
             match.setStadium(null);
         }
     }
+
+    private void validateMatchRequest(MatchUpsertDTO request) {
+        if (request == null) {
+            throw new RuntimeException("Dữ liệu trận đấu không được để trống");
+        }
+
+        if (request.getHomeTeamId() == null) {
+            throw new RuntimeException("Đội chủ nhà không được để trống");
+        }
+
+        if (request.getAwayTeamId() == null) {
+            throw new RuntimeException("Đội khách không được để trống");
+        }
+
+        if (request.getSeasonId() == null) {
+            throw new RuntimeException("Mùa giải không được để trống");
+        }
+
+        if (request.getRoundId() == null) {
+            throw new RuntimeException("Vòng đấu không được để trống");
+        }
+
+        if (request.getMatchDate() == null) {
+            throw new RuntimeException("Ngày thi đấu không được để trống");
+        }
+    }
+
+    @Transactional
+    public MatchDTO updateStatus(Long id, MatchStatusUpdateDTO request) {
+        Match match = matchRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Match not found with id = " + id));
+
+        if (request.getStatus() == null) {
+            throw new RuntimeException("Trạng thái trận đấu không được để trống");
+        }
+
+        match.setStatus(request.getStatus());
+
+        Match savedMatch = matchRepository.save(match);
+
+        if (savedMatch.getStatus() == MatchStatus.FINISHED
+                && savedMatch.getSeason() != null) {
+            standingService.recalculateBySeason(savedMatch.getSeason().getId());
+        }
+
+        return toDTO(savedMatch);
+    }
+
+    public MatchTeamSeasonDTO getTeamSeasonByMatchAndTeam(Long matchId, Long teamId) {
+        Match match = matchRepository.findMatchWithSeasonTeams(matchId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy trận đấu"));
+
+        Long seasonId = match.getSeason().getId();
+
+        SeasonTeam homeSeasonTeam = match.getHomeTeam();
+        SeasonTeam awaySeasonTeam = match.getAwayTeam();
+
+        if (homeSeasonTeam.getTeam().getId().equals(teamId)) {
+            return new MatchTeamSeasonDTO(
+                    match.getId(),
+                    teamId,
+                    seasonId,
+                    homeSeasonTeam.getId()
+            );
+        }
+
+        if (awaySeasonTeam.getTeam().getId().equals(teamId)) {
+            return new MatchTeamSeasonDTO(
+                    match.getId(),
+                    teamId,
+                    seasonId,
+                    awaySeasonTeam.getId()
+            );
+        }
+
+        throw new RuntimeException("Đội bóng không thuộc trận đấu này");
+    }
+
 
     private MatchDTO toDTO(Match match) {
         return new MatchDTO(

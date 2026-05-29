@@ -58,6 +58,15 @@ public class Player extends BaseEntity{
     @Column(nullable = false)
     private String status;
 
+    @Column(name = "source_url")
+    private String sourceUrl;
+
+    @Column(name = "source_name")
+    private String sourceName;
+
+    @Column(name = "normalize_name")
+    private String normalizedName;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "team_id", nullable = false)
     private Team team;
@@ -67,5 +76,10 @@ public class Player extends BaseEntity{
 
     @OneToMany(mappedBy = "player")
     private List<MatchLineup> matchMatchLineups;
+
+    @Column(name = "vpf_player_slug", length = 255)
+    private String vpfPlayerSlug;
+
+
 
 }

@@ -4,6 +4,8 @@ import com.example.demo.entity.user.User;
 import jakarta.persistence.*;
 import lombok.Data;
 
+import java.time.LocalDateTime;
+
 @Entity
 @Data
 @Table(name = "notifications")
@@ -12,16 +14,35 @@ public class Notification extends BaseEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    private Long receiverId;
+
     private String title;
+
+    @Column(columnDefinition = "TEXT")
     private String content;
-    private String link; // Ví dụ: /admin/registration/view/15
+
+    private String type;
 
     private Boolean isRead = false;
 
-    // Gửi cho Role nào (ADMIN hoặc CLUB_MANAGER)
-    private String targetRole;
+    private Long referenceId;
 
-    @ManyToOne
-    @JoinColumn(name = "user_receiver_id")
-    private User receiver;
+    private String referenceType;
+
+    private LocalDateTime createdAt = LocalDateTime.now();
+
+    public Notification() {
+    }
+
+    public Notification(Long receiverId, String title, String content, String type, Long referenceId, String referenceType) {
+        this.receiverId = receiverId;
+        this.title = title;
+        this.content = content;
+        this.type = type;
+        this.referenceId = referenceId;
+        this.referenceType = referenceType;
+        this.isRead = false;
+        this.createdAt = LocalDateTime.now();
+    }
+
 }

@@ -48,15 +48,31 @@ public class RegistrationService {
 
     @Transactional
     public RegistrationSummaryDTO submitRegistration(FullRegistrationDTO dto) {
+        // 2. Lấy Season và Team
+        Season season = seasonRepository.findById(dto.getSeasonID())
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy mùa giải"));
+
+        SystemRule rule = season.getSystemRule();
+
+        Team team = teamRepository.findById(dto.getTeamInfo().getId())
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy câu lạc bộ"));
+
+        if (rule == null) {
+            throw new RuntimeException("Mùa giải chưa được cấu hình bộ luật");
+        }
+
+        if (!"ACTIVE".equalsIgnoreCase(rule.getStatus())) {
+            throw new RuntimeException("Bộ luật của mùa giải đang tạm ngưng");
+        }
         // 1. Kiểm tra hình dáng DTO
         validateRequestShape(dto);
 
-        // 2. Lấy Season và Team
-        Season season = seasonRepository.findById(dto.getSeasonID()).orElseThrow();
-        Team team = teamRepository.findById(dto.getTeamInfo().getId()).orElseThrow();
+
+
+
 
         // 3. Kiểm tra luật của giải (có bị trùng đơn không)
-        validateBusinessRules(team, season);
+        validateBusinessRules(team, season,rule);
 
         // 4. KIỂM TRA HLV VÀ CẦU THỦ
         validateCoachList(dto.getListCoachInfo());
@@ -68,6 +84,7 @@ public class RegistrationService {
             dbPlayersForValidation.add(p);
         }
 
+        validatePlayersBelongToTeam(dbPlayersForValidation, team);
         // Gọi hàm kiểm tra tuổi và số lượng
         validatePlayerList(dto.getListPlayerInfo(), dbPlayersForValidation, season.getSystemRule(), season);
 
@@ -142,6 +159,34 @@ public class RegistrationService {
         return toSummaryDto(savedRegistration);
     }
 
+    private SystemRule getRequiredActiveRule(Season season) {
+        if (season == null) {
+            throw new IllegalArgumentException("Không tìm thấy mùa giải");
+        }
+
+        SystemRule rule = season.getSystemRule();
+
+        if (rule == null) {
+            throw new IllegalArgumentException("Mùa giải chưa được cấu hình bộ luật");
+        }
+
+        if (!"ACTIVE".equalsIgnoreCase(rule.getStatus())) {
+            throw new IllegalArgumentException("Bộ luật của mùa giải đang tạm ngưng");
+        }
+
+        return rule;
+    }
+
+    private void validatePlayersBelongToTeam(List<Player> players, Team team) {
+        for (Player player : players) {
+            if (player.getTeam() == null || !player.getTeam().getId().equals(team.getId())) {
+                throw new IllegalArgumentException(
+                        "Cầu thủ " + player.getName() + " không thuộc biên chế CLB " + team.getName()
+                );
+            }
+        }
+    }
+
     public List<RegistrationSummaryDTO> getRegistrations(RegistrationStatus status) {
         List<RegistrationTeam> registrations = status == null
                 ? teamRegRepo.findAllByOrderByCreatedAtDesc()
@@ -183,8 +228,58 @@ public class RegistrationService {
     }
 
     // Chú ý: Truyền thẳng Object Team vào thay vì đi tìm bằng tên
-    private void validateBusinessRules(Team team, Season season) {
-        // 1. Check xem Team này đã có đơn nào đang chờ duyệt hoặc đã duyệt chưa (Bạn cần viết thêm hàm này trong Repo)
+//    private void validateBusinessRules(Team team, Season season) {
+//        // 1. Check xem Team này đã có đơn nào đang chờ duyệt hoặc đã duyệt chưa (Bạn cần viết thêm hàm này trong Repo)
+//        if (registrationTeamRepository.existsBySeasonIdAndTeamIdAndStatusIn(
+//                season.getId(),
+//                team.getId(),
+//                List.of(RegistrationStatus.PENDING, RegistrationStatus.APPROVED))) {
+//            throw new IllegalArgumentException("Câu lạc bộ này đã có đơn đăng ký trong mùa giải");
+//        }
+//
+//        // 2. Check xem Team đã chính thức nằm trong mùa giải chưa
+//        if (seasonTeamRepository.existsBySeasonIdAndTeamId(season.getId(), team.getId())) {
+//            throw new IllegalArgumentException("Câu lạc bộ này đã tham gia mùa giải");
+//        }
+//    }
+//    private void validateBusinessRules(Team team, Season season) {
+//        if (registrationTeamRepository.existsBySeasonIdAndTeamIdAndStatusIn(
+//                season.getId(),
+//                team.getId(),
+//                List.of(RegistrationStatus.PENDING, RegistrationStatus.APPROVED))) {
+//            throw new IllegalArgumentException("Câu lạc bộ này đã có đơn đăng ký trong mùa giải");
+//        }
+//
+//        if (seasonTeamRepository.existsBySeasonIdAndTeamId(season.getId(), team.getId())) {
+//            throw new IllegalArgumentException("Câu lạc bộ này đã tham gia mùa giải");
+//        }
+//
+//        SystemRule rule = season.getSystemRule();
+//
+//        if (rule == null) {
+//            throw new IllegalArgumentException("Mùa giải chưa được cấu hình bộ luật");
+//        }
+//
+//        if (!"ACTIVE".equalsIgnoreCase(rule.getStatus())) {
+//            throw new IllegalArgumentException("Bộ luật của mùa giải đang tạm ngưng");
+//        }
+//
+//        if (rule.getMaxTeams() != null) {
+//            long approvedTeamCount = seasonTeamRepository.countBySeasonId(season.getId());
+//            long pendingTeamCount = registrationTeamRepository.countBySeasonIdAndStatus(
+//                    season.getId(),
+//                    RegistrationStatus.PENDING
+//            );
+//
+//            if (approvedTeamCount + pendingTeamCount >= rule.getMaxTeams()) {
+//                throw new IllegalArgumentException(
+//                        "Mùa giải đã đạt số đội tối đa theo luật: " + rule.getMaxTeams()
+//                );
+//            }
+//        }
+//    }
+
+    private void validateBusinessRules(Team team, Season season, SystemRule rule) {
         if (registrationTeamRepository.existsBySeasonIdAndTeamIdAndStatusIn(
                 season.getId(),
                 team.getId(),
@@ -192,54 +287,136 @@ public class RegistrationService {
             throw new IllegalArgumentException("Câu lạc bộ này đã có đơn đăng ký trong mùa giải");
         }
 
-        // 2. Check xem Team đã chính thức nằm trong mùa giải chưa
         if (seasonTeamRepository.existsBySeasonIdAndTeamId(season.getId(), team.getId())) {
             throw new IllegalArgumentException("Câu lạc bộ này đã tham gia mùa giải");
         }
+
+        if (rule.getMaxTeams() != null) {
+            long approvedTeamCount = seasonTeamRepository.countBySeasonId(season.getId());
+
+            long pendingTeamCount = registrationTeamRepository.countBySeasonIdAndStatus(
+                    season.getId(),
+                    RegistrationStatus.PENDING
+            );
+
+            if (approvedTeamCount + pendingTeamCount >= rule.getMaxTeams()) {
+                throw new IllegalArgumentException(
+                        "Mùa giải đã đạt số đội tối đa theo luật: " + rule.getMaxTeams()
+                );
+            }
+        }
     }
 
+
     // Nhận vào danh sách DTO để check trùng, và danh sách Entity gốc (lấy từ DB) để check tuổi
-    private void validatePlayerList(List<PlayerRegistrationDTO> dtoList, List<Player> dbPlayers, SystemRule rule, Season season) {
+    private void validatePlayerList(
+            List<PlayerRegistrationDTO> dtoList,
+            List<Player> dbPlayers,
+            SystemRule rule,
+            Season season
+    ) {
         Set<Integer> shirtNumbers = new HashSet<>();
         Set<Long> playerIds = new HashSet<>();
-        LocalDate referenceDate = season.getStartDate() != null ? season.getStartDate() : LocalDate.now();
 
-        // 1. Validate trên DTO (Check trùng lặp số áo và ID cầu thủ trong cùng 1 đơn)
+        LocalDate referenceDate = season.getStartDate() != null
+                ? season.getStartDate()
+                : LocalDate.now();
+
         for (PlayerRegistrationDTO pDto : dtoList) {
+            if (pDto.getPlayerId() == null) {
+                throw new IllegalArgumentException("Cầu thủ không được để trống");
+            }
+
             if (pDto.getShirtNumber() == null) {
                 throw new IllegalArgumentException("Số áo cầu thủ không được để trống");
             }
+
             if (!shirtNumbers.add(pDto.getShirtNumber())) {
-                throw new IllegalArgumentException("Có cầu thủ bị trùng số áo (" + pDto.getShirtNumber() + ") trong đơn đăng ký");
+                throw new IllegalArgumentException(
+                        "Có cầu thủ bị trùng số áo (" + pDto.getShirtNumber() + ") trong đơn đăng ký"
+                );
             }
+
             if (!playerIds.add(pDto.getPlayerId())) {
-                throw new IllegalArgumentException("Cầu thủ ID " + pDto.getPlayerId() + " bị chọn nhiều lần trong đơn");
+                throw new IllegalArgumentException(
+                        "Cầu thủ ID " + pDto.getPlayerId() + " bị chọn nhiều lần trong đơn"
+                );
+            }
+
+            if (pDto.getPosition() == null || pDto.getPosition().isBlank()) {
+                throw new IllegalArgumentException(
+                        "Vị trí đăng ký của cầu thủ không được để trống"
+                );
             }
         }
 
-        // 2. Validate trên Object thực tế (Rule độ tuổi, số lượng)
-        if (rule != null) {
-            int squadSize = dbPlayers.size();
-            if (rule.getMinPlayers() != null && squadSize < rule.getMinPlayers()) {
-                throw new IllegalArgumentException("Số lượng cầu thủ (" + squadSize + ") chưa đạt tối thiểu (" + rule.getMinPlayers() + ")");
-            }
-            if (rule.getMaxPlayers() != null && squadSize > rule.getMaxPlayers()) {
-                throw new IllegalArgumentException("Số lượng cầu thủ (" + squadSize + ") vượt quá tối đa (" + rule.getMaxPlayers() + ")");
-            }
+        int squadSize = dbPlayers.size();
 
-            // Tính tuổi từ DB
-            for (Player player : dbPlayers) {
-                if (player.getDateOfBirth() != null) {
-                    int age = Period.between(player.getDateOfBirth(), referenceDate).getYears();
-                    if (rule.getMinAge() != null && age < rule.getMinAge()) {
-                        throw new IllegalArgumentException("Cầu thủ " + player.getName() + " (" + age + " tuổi) chưa đủ tuổi quy định");
-                    }
-                    if (rule.getMaxAge() != null && age > rule.getMaxAge()) {
-                        throw new IllegalArgumentException("Cầu thủ " + player.getName() + " (" + age + " tuổi) vượt quá tuổi quy định");
-                    }
+        if (rule.getMinRegistrationPlayers() != null
+                && squadSize < rule.getMinRegistrationPlayers()) {
+            throw new IllegalArgumentException(
+                    "Số lượng cầu thủ đăng ký (" + squadSize + ") chưa đạt tối thiểu theo luật ("
+                            + rule.getMinRegistrationPlayers() + ")"
+            );
+        }
+
+        if (rule.getMinPlayers() != null && squadSize < rule.getMinPlayers()) {
+            throw new IllegalArgumentException(
+                    "Số lượng cầu thủ (" + squadSize + ") chưa đạt tối thiểu (" + rule.getMinPlayers() + ")"
+            );
+        }
+
+        if (rule.getMaxPlayers() != null && squadSize > rule.getMaxPlayers()) {
+            throw new IllegalArgumentException(
+                    "Số lượng cầu thủ (" + squadSize + ") vượt quá tối đa (" + rule.getMaxPlayers() + ")"
+            );
+        }
+
+        if (rule.getMaxForeignPlayers() != null) {
+            long foreignCount = dbPlayers.stream()
+                    .filter(this::isForeignPlayer)
+                    .count();
+
+            if (foreignCount > rule.getMaxForeignPlayers()) {
+                throw new IllegalArgumentException(
+                        "Số ngoại binh (" + foreignCount + ") vượt quá giới hạn theo luật ("
+                                + rule.getMaxForeignPlayers() + ")"
+                );
+            }
+        }
+
+        for (Player player : dbPlayers) {
+            if (player.getDateOfBirth() != null) {
+                int age = Period.between(player.getDateOfBirth(), referenceDate).getYears();
+
+                if (rule.getMinAge() != null && age < rule.getMinAge()) {
+                    throw new IllegalArgumentException(
+                            "Cầu thủ " + player.getName() + " (" + age + " tuổi) chưa đủ tuổi quy định"
+                    );
+                }
+
+                if (rule.getMaxAge() != null && age > rule.getMaxAge()) {
+                    throw new IllegalArgumentException(
+                            "Cầu thủ " + player.getName() + " (" + age + " tuổi) vượt quá tuổi quy định"
+                    );
                 }
             }
         }
+    }
+
+    private boolean isForeignPlayer(Player player) {
+        String nationality = player.getNationality();
+
+        if (nationality == null || nationality.isBlank()) {
+            return false;
+        }
+
+        String normalized = nationality.trim().toLowerCase();
+
+        return !normalized.equals("việt nam")
+                && !normalized.equals("viet nam")
+                && !normalized.equals("vietnam")
+                && !normalized.equals("vn");
     }
 
     private void validateCoachList(List<CoachRegistrationDTO> coaches) {

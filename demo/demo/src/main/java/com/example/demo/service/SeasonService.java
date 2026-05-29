@@ -5,12 +5,14 @@ import com.example.demo.dao.LeagueRepository;
 import com.example.demo.dao.SystemRuleRepository;
 import com.example.demo.dao.season.SeasonRepository;
 import com.example.demo.dao.season.SeasonTeamRepository;
+import com.example.demo.dto.SeasonDTO;
 import com.example.demo.entity.League;
 import com.example.demo.entity.Season;
 import com.example.demo.entity.SeasonTeam;
 import com.example.demo.entity.Stadium;
 import com.example.demo.entity.SystemRule;
 import com.example.demo.entity.Team;
+import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -91,8 +93,36 @@ public class SeasonService {
     private void applySeasonRequest(Season season, SeasonController.SeasonRequest request) {
         League league = request.leagueId() == null ? null : leagueRepository.findById(request.leagueId())
                 .orElseThrow(() -> new ResourceNotFoundException("League not found with id = " + request.leagueId()));
-        SystemRule systemRule = request.systemRuleId() == null ? null : systemRuleRepository.findById(request.systemRuleId())
-                .orElseThrow(() -> new ResourceNotFoundException("System rule not found with id = " + request.systemRuleId()));
+        if (request.systemRuleId() == null) {
+            throw new RuntimeException("Vui lòng chọn bộ luật áp dụng cho mùa giải");
+        }
+
+        SystemRule systemRule = systemRuleRepository.findById(request.systemRuleId())
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "System rule not found with id = " + request.systemRuleId()
+                ));
+
+        if (!"ACTIVE".equalsIgnoreCase(systemRule.getStatus())) {
+            throw new RuntimeException("Không thể áp dụng bộ luật đang tạm ngưng");
+        }
+
+        if (request.startDate() != null
+                && request.endDate() != null
+                && request.startDate().isAfter(request.endDate())) {
+            throw new RuntimeException("Ngày bắt đầu không được sau ngày kết thúc");
+        }
+
+        long currentTeamCount = seasonTeamRepository.countBySeasonId(season.getId());
+
+        if (systemRule.getMaxTeams() != null
+                && currentTeamCount > systemRule.getMaxTeams()) {
+            throw new RuntimeException(
+                    "Không thể áp dụng luật này vì mùa giải hiện có "
+                            + currentTeamCount
+                            + " đội, vượt quá giới hạn "
+                            + systemRule.getMaxTeams()
+            );
+        }
 
         season.setYear(request.year());
         season.setName(request.name());
@@ -133,5 +163,24 @@ public class SeasonService {
         int end = Math.min(start + pageable.getPageSize(), items.size());
         List<T> content = start >= items.size() ? List.of() : items.subList(start, end);
         return new PageImpl<>(content, pageable, items.size());
+    }
+
+    @Transactional
+    public SeasonController.SeasonResponse assignSystemRule(Long seasonId, Long ruleId) {
+        Season season = seasonRepository.findById(seasonId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy mùa giải id = " + seasonId));
+
+        SystemRule rule = systemRuleRepository.findById(ruleId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy luật id = " + ruleId));
+
+        if (!"ACTIVE".equalsIgnoreCase(rule.getStatus())) {
+            throw new RuntimeException("Không thể áp dụng bộ luật đang tạm ngưng");
+        }
+
+        season.setSystemRule(rule);
+
+        Season saved = seasonRepository.save(season);
+
+        return toSeasonResponse(saved);
     }
 }

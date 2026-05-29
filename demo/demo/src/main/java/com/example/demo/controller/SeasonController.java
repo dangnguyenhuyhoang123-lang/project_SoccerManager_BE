@@ -1,5 +1,6 @@
 package com.example.demo.controller;
 
+import com.example.demo.dto.SeasonDTO;
 import com.example.demo.service.SeasonService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -46,6 +47,14 @@ public class SeasonController {
     @PutMapping("/updateSeason/{id}")
     public SeasonResponse updateSeason(@PathVariable Long id, @RequestBody SeasonRequest request) {
         return seasonService.update(id, request);
+    }
+
+    @PatchMapping("/{seasonId}/system-rule/{ruleId}")
+    public SeasonResponse assignSystemRule(
+            @PathVariable Long seasonId,
+            @PathVariable Long ruleId
+    ) {
+        return seasonService.assignSystemRule(seasonId, ruleId);
     }
 
     @DeleteMapping("/deleteSeason/{id}")

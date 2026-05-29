@@ -12,6 +12,11 @@ public class SystemRule {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "rule_name", nullable = false)
+    private String ruleName;
+
+    @Column(name = "description", columnDefinition = "TEXT")
+    private String description;
     // Số đội tối đa trong giải
     @Column(name = "max_teams")
     private Integer maxTeams;

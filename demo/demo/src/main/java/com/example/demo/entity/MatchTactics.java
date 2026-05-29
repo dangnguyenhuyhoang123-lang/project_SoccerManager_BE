@@ -7,7 +7,13 @@ import java.util.List;
 
 @Entity
 @Data
-@Table(name = "match_tactics")
+@Table(
+        name = "match_tactics",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_match_tactics_match_team",
+                columnNames = {"match_id", "team_id"}
+        )
+)
 public class MatchTactics extends BaseEntity {
 
     @Id

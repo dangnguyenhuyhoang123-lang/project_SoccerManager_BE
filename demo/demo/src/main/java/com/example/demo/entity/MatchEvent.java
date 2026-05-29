@@ -15,9 +15,12 @@ public class MatchEvent extends BaseEntity {
     @Column(nullable = false)
     private Integer minute;
 
+    @Column(name = "extra_minute")
+    private Integer extraMinute;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private EventType eventType; // GOAL, CARD, SUBSTITUTION, TIMEOUT...
+    private EventType eventType;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "goal_type")
@@ -45,6 +48,10 @@ public class MatchEvent extends BaseEntity {
     @JoinColumn(name = "assist_player_id")
     private Player assistPlayer;
 
+
+    @Column(name = "event_order")
+    private Integer eventOrder;
+
     @Column(length = 500)
-    private String note; // Ghi chú thêm (Ví dụ: "Lỗi phản ứng", "Sút xa")
+    private String note;
 }

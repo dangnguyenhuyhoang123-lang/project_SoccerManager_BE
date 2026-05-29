@@ -41,6 +41,7 @@ public class Team extends BaseEntity{
     @Column
     private String owner;
 
+    @Column(columnDefinition = "LONGTEXT")
     private String description;
 
     @Column(nullable = false)
@@ -57,7 +58,7 @@ public class Team extends BaseEntity{
     private List<Player> players;
 
     @OneToMany(mappedBy = "team", cascade = CascadeType.ALL)
-    private List<Player> coaches;
+    private List<Coach> coaches;
 
 
 
@@ -69,4 +70,20 @@ public class Team extends BaseEntity{
 
     @OneToMany(mappedBy = "team")
     private List<SeasonTeam> participatingSeasons = new ArrayList<>();
+
+
+    @Column(name = "vpf_team_id", length = 100)
+    private String vpfTeamId;
+
+    @Column(name = "sportsdb_team_id", length = 100)
+    private String sportsDbTeamId;
+
+    @Column(name = "normalized_name", length = 255)
+    private String normalizedName;
+
+    @Column(name = "source_name", length = 100)
+    private String sourceName;
+
+    @Column(name = "source_url", length = 100)
+    private String sourceUrl;
 }

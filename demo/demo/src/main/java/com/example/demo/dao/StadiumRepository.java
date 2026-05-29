@@ -12,4 +12,8 @@ public interface StadiumRepository extends JpaRepository<Stadium, Long> {
     Optional<Stadium> findByNameIgnoreCaseAndAddressIgnoreCase(String name, String address);
 
     List<Stadium> findByNameContainingIgnoreCase(String name);
+
+    Optional<Stadium> findByNameIgnoreCase(String name);
+
+    Optional<Stadium> findByNormalizedName(String normalizedName);
 }

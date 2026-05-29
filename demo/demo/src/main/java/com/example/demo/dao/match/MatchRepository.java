@@ -2,6 +2,7 @@ package com.example.demo.dao.match;
 
 import com.example.demo.entity.Match;
 import com.example.demo.entity.MatchStatus;
+import com.example.demo.entity.Season;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -10,6 +11,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 
 
 public interface MatchRepository extends JpaRepository<Match,Long> {
@@ -60,4 +62,49 @@ public interface MatchRepository extends JpaRepository<Match,Long> {
     @Query("SELECT m FROM Match m WHERE m.status = 'SCHEDULED' ORDER BY m.matchDate ASC")
     List<Match> findUpcomingMatches();
 
+    Optional<Match> findBySeasonAndVpfMatchCode(Season season, Integer vpfMatchCode);
+
+    Optional<Match> findBySportsDbEventId(String sportsDbEventId);
+
+    List<Match> findBySeasonOrderByMatchDateAsc(Season season);
+
+    @Query("""
+        SELECT m
+        FROM Match m
+        JOIN FETCH m.season s
+        JOIN FETCH m.round r
+        JOIN FETCH m.homeTeam ht
+        JOIN FETCH ht.team hTeam
+        JOIN FETCH m.awayTeam at
+        JOIN FETCH at.team aTeam
+        LEFT JOIN FETCH m.stadium st
+        WHERE s.year = :seasonYear
+        ORDER BY r.roundNumber ASC, m.matchDate ASC
+        """)
+    List<Match> findVLeagueMatchesBySeasonYear(@Param("seasonYear") String seasonYear);
+
+
+
+
+    @EntityGraph(attributePaths = {
+            "season",
+            "homeTeam",
+            "homeTeam.team",
+            "awayTeam",
+            "awayTeam.team",
+            "stadium"
+    })
+    List<Match> findBySeasonIdAndStatus(Long seasonId, MatchStatus status);
+
+    @Query("""
+    SELECT m
+    FROM Match m
+    JOIN FETCH m.season s
+    JOIN FETCH m.homeTeam ht
+    JOIN FETCH ht.team hTeam
+    JOIN FETCH m.awayTeam at
+    JOIN FETCH at.team aTeam
+    WHERE m.id = :matchId
+""")
+    Optional<Match> findMatchWithSeasonTeams(@Param("matchId") Long matchId);
 }

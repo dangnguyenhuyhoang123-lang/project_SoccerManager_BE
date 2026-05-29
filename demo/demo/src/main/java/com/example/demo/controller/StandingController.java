@@ -47,4 +47,9 @@ public class StandingController {
             String recentForm
     ) {
     }
+
+    @PostMapping("/recalculate")
+    public List<StandingResponse> recalculateStandings(@RequestParam Long seasonId) {
+        return standingService.recalculateBySeason(seasonId);
+    }
 }

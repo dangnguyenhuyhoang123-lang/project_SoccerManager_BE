@@ -1,4 +1,4 @@
-package com.example.demo.service;
+package com.example.demo.service.crawl;
 
 import com.example.demo.dao.NewsArticleRepository;
 import com.example.demo.entity.news.NewsArticle;

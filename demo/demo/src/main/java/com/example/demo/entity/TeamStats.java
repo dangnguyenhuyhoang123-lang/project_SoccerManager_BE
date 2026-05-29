@@ -32,6 +32,9 @@ public class TeamStats {
     @Column(name = "possession_avg")
     private Double possessionAvg;
 
+    @Column
+    private Integer played;
+
     @Column(name = "total_goals")
     private Integer totalGoals;
 

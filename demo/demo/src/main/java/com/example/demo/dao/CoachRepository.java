@@ -20,7 +20,9 @@ public interface CoachRepository extends JpaRepository<Coach,Long> {
 
     Page<Coach> findByNameContainingIgnoreCaseAndStatus(String name, String status, Pageable pageable);
 
+    Optional<Coach> findByNormalizedName(String normalizedName);
 
+    Optional<Coach> findByNameIgnoreCase(String name);
 
     Page<Coach> findByTeamId(Long teamId, Pageable pageable);
 }

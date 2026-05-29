@@ -1,6 +1,7 @@
 package com.example.demo.dao.match;
 
 import com.example.demo.entity.MatchStats;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -22,9 +23,11 @@ public interface MatchStatsRepository extends JpaRepository<MatchStats,Long> {
     List<MatchStats> findFullStats(@Param("matchId") Long matchId);
 
 
-    // Lấy thống kê của cả 2 đội trong 1 trận để đẩy lên UI vẽ chart
+
+    @EntityGraph(attributePaths = {"match", "team"})
     List<MatchStats> findByMatchId(Long matchId);
 
-    // Tìm stats của 1 đội trong trận để cộng dồn (+1 sút, +1 thẻ...)
     Optional<MatchStats> findByMatchIdAndTeamId(Long matchId, Long teamId);
+
+    void deleteByMatchId(Long matchId);
 }

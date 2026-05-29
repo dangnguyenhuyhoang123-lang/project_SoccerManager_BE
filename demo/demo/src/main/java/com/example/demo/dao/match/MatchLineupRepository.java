@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface MatchLineupRepository extends JpaRepository<MatchLineup,Long> {
@@ -24,4 +25,11 @@ public interface MatchLineupRepository extends JpaRepository<MatchLineup,Long> {
 
     @EntityGraph(attributePaths = {"player", "matchTactics", "matchTactics.team", "matchTactics.match"})
     List<MatchLineup> findByMatchTactics_IdOrderByLineupOrderAsc(Long tacticsId);
+
+    @EntityGraph(attributePaths = {"matchTactics", "player"})
+    List<MatchLineup> findByMatchTacticsIdOrderByIsStartingDescLineupOrderAscIdAsc(Long tacticsId);
+
+    Optional<MatchLineup> findByMatchTacticsIdAndPlayerId(Long tacticsId, Long playerId);
+
+    void deleteByMatchTacticsId(Long tacticsId);
 }

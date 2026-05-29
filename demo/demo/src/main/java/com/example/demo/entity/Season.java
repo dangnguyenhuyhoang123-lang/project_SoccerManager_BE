@@ -51,4 +51,14 @@ public class Season extends BaseEntity{
     @OneToMany(mappedBy = "season")
     private List<SeasonTeamCoach> coachAssignments;
 
+
+    @Column(name = "vpf_season_url", length = 1000)
+    private String vpfSeasonUrl;
+
+    @Column(name = "sportsdb_season", length = 50)
+    private String sportsDbSeason;
+
+    @Column(name = "source_name", length = 100)
+    private String sourceName;
+
 }

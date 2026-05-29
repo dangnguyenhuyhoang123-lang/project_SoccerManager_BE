@@ -1,6 +1,7 @@
 package com.example.demo.dao.team;
 
 import com.example.demo.entity.Team;
+import com.example.demo.entity.user.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -19,4 +20,13 @@ public interface TeamRepository extends JpaRepository<Team, Long> {
     Page<Team> findByCityContainingIgnoreCase(String city, Pageable pageable);
 
     Page<Team> findByNameContainingIgnoreCaseAndCityContainingIgnoreCase(String name, String city, Pageable pageable);
+
+
+
+
+    Optional<Team> findByNormalizedName(String normalizedName);
+
+    Optional<Team> findByVpfTeamId(String vpfTeamId);
+
+    Optional<Team> findBySportsDbTeamId(String sportsDbTeamId);
 }

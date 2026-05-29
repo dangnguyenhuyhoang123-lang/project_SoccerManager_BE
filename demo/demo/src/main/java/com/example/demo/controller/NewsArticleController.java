@@ -3,7 +3,7 @@ package com.example.demo.controller;
 import com.example.demo.dao.NewsArticleRepository;
 import com.example.demo.dto.news.NewsArticleDetailResponse;
 import com.example.demo.dto.news.NewsArticleResponse;
-import com.example.demo.service.VffNewsCrawlerService;
+import com.example.demo.service.crawl.VffNewsCrawlerService;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.web.bind.annotation.*;

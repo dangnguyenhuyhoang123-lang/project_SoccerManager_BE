@@ -1,4 +1,4 @@
-package com.example.demo.dto;
+package com.example.demo.dto.user;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -13,6 +13,7 @@ public class UserDTO {
     private String email;
     private String username;
     private String displayName;
+    private String avatar;
     private Boolean status;
     private List<String> roles;
     private Long teamId;

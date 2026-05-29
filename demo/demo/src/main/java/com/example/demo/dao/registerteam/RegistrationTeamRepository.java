@@ -27,7 +27,7 @@ public interface RegistrationTeamRepository extends JpaRepository<RegistrationTe
             List<RegistrationStatus> statuses
     );
 
-
+    long countBySeasonIdAndStatus(Long seasonId, RegistrationStatus status);
 
     // 2. Dùng ở dòng 141 (Kiểm tra xem Team này đã nộp đơn nào đang chờ duyệt hoặc đã duyệt chưa)
     boolean existsBySeasonIdAndTeamIdAndStatusIn(Long seasonId, Long teamId, List<RegistrationStatus> statuses);

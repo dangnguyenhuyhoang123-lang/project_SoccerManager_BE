@@ -6,7 +6,13 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "lineup")
+@Table(
+        name = "lineup",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_lineup_tactics_player",
+                columnNames = {"tactics_id", "player_id"}
+        )
+)
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -16,12 +22,11 @@ public class MatchLineup {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "tactics_id")
+    @JoinColumn(name = "tactics_id", nullable = false)
     private MatchTactics matchTactics;
 
-    // cầu thủ
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "player_id")
+    @JoinColumn(name = "player_id", nullable = false)
     private Player player;
 
     // vị trí thi đấu trên sân (string hoặc chuẩn hóa)

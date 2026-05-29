@@ -133,10 +133,13 @@ public class PlayerSeasonService {
     }
 
     private PlayerSeasonController.PlayerSeasonResponse toResponse(PlayerSeason playerSeason) {
+        Player player = playerSeason.getPlayer();
+
         return new PlayerSeasonController.PlayerSeasonResponse(
                 playerSeason.getId(),
-                playerSeason.getPlayer() != null ? playerSeason.getPlayer().getId() : null,
-                playerSeason.getPlayer() != null ? playerSeason.getPlayer().getName() : null,
+                player != null ? player.getId() : null,
+                player != null ? player.getName() : null,
+                player != null ? player.getAvatar() : null,
                 playerSeason.getTeam() != null ? playerSeason.getTeam().getId() : null,
                 playerSeason.getTeam() != null ? playerSeason.getTeam().getName() : null,
                 playerSeason.getSeason() != null ? playerSeason.getSeason().getId() : null,

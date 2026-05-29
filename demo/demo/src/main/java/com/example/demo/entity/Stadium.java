@@ -30,4 +30,14 @@ public class Stadium {
     @OneToMany(mappedBy = "stadium")
     private List<Team> homeTeams;
 
+
+    @Column(name = "source_name", length = 100)
+    private String sourceName;
+
+    @Column(name = "normalized_name", length = 255)
+    private String normalizedName;
+
+    @Column(name = "image_url", length = 255)
+    private String imageUrl;
+
 }

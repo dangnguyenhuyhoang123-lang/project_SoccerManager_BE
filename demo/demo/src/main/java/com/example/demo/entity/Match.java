@@ -21,7 +21,7 @@ import java.util.stream.Collectors;
                 @Index(name = "idx_match_away_team", columnList = "away_team")
         }
 )
-public class Match {
+public class Match extends  BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -71,5 +71,24 @@ public class Match {
 
     @OneToMany(mappedBy = "match", cascade = CascadeType.ALL)
     private List<MatchStats> stats;
+
+
+    @Column(name = "vpf_match_code")
+    private Integer vpfMatchCode;
+
+    @Column(name = "sportsdb_event_id", length = 100)
+    private String sportsDbEventId;
+
+    @Column(name = "source_url", length = 1000)
+    private String sourceUrl;
+
+    @Column(name = "broadcast", length = 500)
+    private String broadcast;
+
+    @Column(name = "attendance")
+    private Integer attendance;
+
+    @Column(name = "source_name", length = 100)
+    private String sourceName;
 
 }
