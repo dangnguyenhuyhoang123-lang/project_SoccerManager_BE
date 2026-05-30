@@ -11,11 +11,12 @@ import com.example.demo.dao.season.SeasonTeamRepository;
 import com.example.demo.dao.team.TeamRepository;
 import com.example.demo.dao.user.UserRepository;
 import com.example.demo.dto.*;
+import com.example.demo.dto.aipredict.MatchPredictResponse;
 import com.example.demo.entity.*;
 import com.example.demo.entity.user.User;
+import com.example.demo.service.ai.MatchPredictionService;
 import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -26,7 +27,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 @AllArgsConstructor
@@ -63,8 +67,11 @@ public class MatchService {
 
     private final NotificationService notificationService;
 
+    private final RealtimeEventService realtimeEventService;
+
     private final UserRepository userRepository;
 
+    private final MatchPredictionService matchPredictionService;
 
 
 
@@ -131,6 +138,11 @@ public class MatchService {
         if (savedMatch.getStatus() == MatchStatus.FINISHED) {
             standingService.recalculateBySeason(savedMatch.getSeason().getId());
         }
+
+        sendMatchEventToRelatedClubManagers(
+                savedMatch,
+                realtimeEvent("MATCH_CREATED", savedMatch.getId(), "MATCH", "REFETCH_MATCHES")
+        );
 
         return toDTO(savedMatch);
     }
@@ -244,6 +256,11 @@ public class MatchService {
             standingService.recalculateBySeason(newSeasonId);
         }
 
+        sendMatchEventToRelatedClubManagers(
+                savedMatch,
+                realtimeEvent("MATCH_UPDATED", savedMatch.getId(), "MATCH", "REFETCH_MATCHES")
+        );
+
         return toDTO(savedMatch);
     }
 
@@ -253,12 +270,18 @@ public class MatchService {
                 .orElseThrow(() -> new ResourceNotFoundException("Match not found with id = " + id));
 
         Long seasonId = match.getSeason() != null ? match.getSeason().getId() : null;
+        Set<Long> clubManagerUserIds = findRelatedClubManagerUserIds(match);
 
         matchRepository.delete(match);
 
         if (seasonId != null) {
             standingService.recalculateBySeason(seasonId);
         }
+
+        realtimeEventService.sendToUsers(
+                clubManagerUserIds,
+                realtimeEvent("MATCH_DELETED", id, "MATCH", "REFETCH_MATCHES")
+        );
     }
 
     private void applyRequest(Match match, MatchUpsertDTO request) {
@@ -368,7 +391,94 @@ public class MatchService {
             standingService.recalculateBySeason(savedMatch.getSeason().getId());
         }
 
+        sendMatchEventToRelatedClubManagers(
+                savedMatch,
+                realtimeEvent("MATCH_STATUS_UPDATED", savedMatch.getId(), "MATCH", "REFETCH_MATCHES")
+        );
+
+        if (savedMatch.getStatus() == MatchStatus.FINISHED
+                && savedMatch.getSeason() != null) {
+            sendMatchEventToRelatedClubManagers(
+                    savedMatch,
+                    realtimeEvent("STANDING_UPDATED", savedMatch.getSeason().getId(), "STANDING", "REFETCH_STANDINGS")
+            );
+        }
+
         return toDTO(savedMatch);
+    }
+
+    private Long findClubManagerUserIdBySeasonTeam(SeasonTeam seasonTeam) {
+        return findClubManagerBySeasonTeam(seasonTeam)
+                .map(User::getId)
+                .orElse(null);
+    }
+
+    private Optional<User> findClubManagerBySeasonTeam(SeasonTeam seasonTeam) {
+        if (seasonTeam == null || seasonTeam.getTeam() == null) {
+            return Optional.empty();
+        }
+
+        Team team = seasonTeam.getTeam();
+
+        Optional<User> managerOpt =
+                userRepository.findClubManagerByTeamIdAndRoleName(
+                        team.getId(),
+                        "ROLE_CLUB_MANAGER"
+                );
+
+        if (managerOpt.isEmpty()) {
+            managerOpt = userRepository.findClubManagerByTeamIdAndRoleName(
+                    team.getId(),
+                    "CLUB_MANAGER"
+            );
+        }
+
+        if (managerOpt.isEmpty()) {
+            managerOpt = userRepository.findFirstByTeamId(team.getId());
+        }
+
+        return managerOpt;
+    }
+
+    private Set<Long> findRelatedClubManagerUserIds(Match match) {
+        Set<Long> userIds = new LinkedHashSet<>();
+
+        if (match == null) {
+            return userIds;
+        }
+
+        Long homeManagerId = findClubManagerUserIdBySeasonTeam(match.getHomeTeam());
+        Long awayManagerId = findClubManagerUserIdBySeasonTeam(match.getAwayTeam());
+
+        if (homeManagerId != null) {
+            userIds.add(homeManagerId);
+        }
+
+        if (awayManagerId != null) {
+            userIds.add(awayManagerId);
+        }
+
+        return userIds;
+    }
+
+    private void sendMatchEventToRelatedClubManagers(Match match, RealtimeEventDTO event) {
+        realtimeEventService.sendToUsers(findRelatedClubManagerUserIds(match), event);
+    }
+
+    private RealtimeEventDTO realtimeEvent(
+            String type,
+            Long referenceId,
+            String referenceType,
+            String action
+    ) {
+        return new RealtimeEventDTO(
+                type,
+                referenceId,
+                referenceType,
+                action,
+                null,
+                LocalDateTime.now()
+        );
     }
 
     public MatchTeamSeasonDTO getTeamSeasonByMatchAndTeam(Long matchId, Long teamId) {
@@ -413,7 +523,9 @@ public class MatchService {
                 toRoundDto(match.getRound()),
                 toTeamDto(match.getHomeTeam().getTeam()),
                 toTeamDto(match.getAwayTeam().getTeam()),
-                toSeasonDto(match.getSeason())
+                toSeasonDto(match.getSeason()),
+                match.getPredictedHomeScore() != null ? match.getPredictedHomeScore() : null,
+                match.getPredictedAwayScore() != null ? match.getPredictedAwayScore() : null
         );
     }
 
@@ -487,5 +599,71 @@ public class MatchService {
                 round.getStatus(),
                 round.getSeason() != null ? round.getSeason().getId() : null
         );
+    }
+
+//    ============Predict===========
+
+    @Transactional
+    public MatchDTO predictMatchScore(Long matchId) {
+        Match match = matchRepository.findById(matchId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy trận đấu"));
+
+        // Chỉ cho dự đoán trận chưa diễn ra
+        if (match.getStatus() != MatchStatus.SCHEDULED) {
+            throw new RuntimeException("Chỉ có thể dự đoán trận đấu chưa diễn ra");
+        }
+
+        // Nếu đã có tỉ số thật thì không cho dự đoán nữa
+        if (match.getHomeScore() != null || match.getAwayScore() != null) {
+            throw new RuntimeException("Trận đấu đã có tỉ số thật, không thể dự đoán");
+        }
+
+        SeasonTeam homeSeasonTeam = match.getHomeTeam();
+        SeasonTeam awaySeasonTeam = match.getAwayTeam();
+
+        if (homeSeasonTeam == null || awaySeasonTeam == null) {
+            throw new RuntimeException("Trận đấu thiếu thông tin đội bóng");
+        }
+
+        Team homeTeam = homeSeasonTeam.getTeam();
+        Team awayTeam = awaySeasonTeam.getTeam();
+
+        if (homeTeam == null || awayTeam == null) {
+            throw new RuntimeException("SeasonTeam chưa liên kết với Team");
+        }
+
+        String homeTeamName = homeTeam.getName();
+        String awayTeamName = awayTeam.getName();
+
+        if (homeTeamName == null || homeTeamName.isBlank()) {
+            throw new RuntimeException("Tên đội chủ nhà không hợp lệ");
+        }
+
+        if (awayTeamName == null || awayTeamName.isBlank()) {
+            throw new RuntimeException("Tên đội khách không hợp lệ");
+        }
+
+        MatchPredictResponse prediction = matchPredictionService.predict(
+                homeTeamName,
+                awayTeamName
+        );
+
+        if (prediction == null) {
+            throw new RuntimeException("Không nhận được kết quả dự đoán từ AI service");
+        }
+
+        if (prediction.getHomeScore() == null || prediction.getAwayScore() == null) {
+            throw new RuntimeException("AI service trả về thiếu tỉ số dự đoán");
+        }
+
+        Integer predictedHomeScore = Math.max(0, prediction.getHomeScore());
+        Integer predictedAwayScore = Math.max(0, prediction.getAwayScore());
+
+        match.setPredictedHomeScore(predictedHomeScore);
+        match.setPredictedAwayScore(predictedAwayScore);
+
+        Match savedMatch = matchRepository.save(match);
+
+        return toDTO(savedMatch);
     }
 }

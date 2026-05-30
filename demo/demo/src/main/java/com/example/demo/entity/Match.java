@@ -91,4 +91,12 @@ public class Match extends  BaseEntity {
     @Column(name = "source_name", length = 100)
     private String sourceName;
 
+    @Column(name ="predict_home_score")
+    private Integer predictedHomeScore;
+
+    @Column(name ="predict_away_score")
+    private Integer predictedAwayScore;
+
+
+
 }

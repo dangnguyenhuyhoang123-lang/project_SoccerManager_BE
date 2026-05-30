@@ -8,6 +8,8 @@ import com.example.demo.dao.registerteam.RegistrationTeamRepository;
 import com.example.demo.dao.season.SeasonRepository;
 import com.example.demo.dao.season.SeasonTeamRepository;
 import com.example.demo.dao.team.TeamRepository;
+import com.example.demo.dao.user.UserRepository;
+import com.example.demo.dto.RealtimeEventDTO;
 import com.example.demo.dto.registrationclub.CoachRegistrationDTO;
 import com.example.demo.dto.registrationclub.FullRegistrationDTO;
 import com.example.demo.dto.registrationclub.PlayerRegistrationDTO;
@@ -21,11 +23,14 @@ import com.example.demo.entity.registerclub.RegistrationPlayer;
 import com.example.demo.entity.registerclub.RegistrationStadium;
 import com.example.demo.entity.registerclub.RegistrationStatus;
 import com.example.demo.entity.registerclub.RegistrationTeam;
+import com.example.demo.entity.user.User;
+import com.example.demo.service.RealtimeEventService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.Period;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -45,6 +50,8 @@ public class RegistrationService {
     private final RegistrationCoachRepository registrationCoachRepository;
     private final PlayerRepository playerRepository;
     private  final CoachRepository coachRepository;
+    private final UserRepository userRepository;
+    private final RealtimeEventService realtimeEventService;
 
     @Transactional
     public RegistrationSummaryDTO submitRegistration(FullRegistrationDTO dto) {
@@ -156,7 +163,38 @@ public class RegistrationService {
 
         // 7. Lưu toàn bộ đơn đăng ký vào DB
         RegistrationTeam savedRegistration = registrationTeamRepository.save(registration);
+        sendRegistrationSubmittedEventToAdmins(savedRegistration);
         return toSummaryDto(savedRegistration);
+    }
+
+    private void sendRegistrationSubmittedEventToAdmins(RegistrationTeam savedRegistration) {
+        List<User> admins = userRepository.findUsersByRoleName("ROLE_ADMIN");
+        RealtimeEventDTO event = realtimeEvent(
+                "REGISTRATION_SUBMITTED",
+                savedRegistration.getId(),
+                "REGISTRATION_TEAM",
+                "REFETCH_REGISTRATIONS"
+        );
+
+        for (User admin : admins) {
+            realtimeEventService.sendToUser(admin.getId(), event);
+        }
+    }
+
+    private RealtimeEventDTO realtimeEvent(
+            String type,
+            Long referenceId,
+            String referenceType,
+            String action
+    ) {
+        return new RealtimeEventDTO(
+                type,
+                referenceId,
+                referenceType,
+                action,
+                null,
+                LocalDateTime.now()
+        );
     }
 
     private SystemRule getRequiredActiveRule(Season season) {

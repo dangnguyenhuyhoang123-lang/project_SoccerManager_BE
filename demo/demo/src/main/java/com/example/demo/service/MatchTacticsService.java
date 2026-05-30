@@ -7,6 +7,7 @@ import com.example.demo.dao.player.PlayerRepository;
 import com.example.demo.dao.player.PlayerSeasonRepository;
 import com.example.demo.dao.team.TeamRepository;
 import com.example.demo.dao.user.UserRepository;
+import com.example.demo.dto.RealtimeEventDTO;
 import com.example.demo.dto.lineups.*;
 import com.example.demo.entity.*;
 import com.example.demo.entity.user.User;
@@ -14,6 +15,7 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.*;
 
 @Service
@@ -28,6 +30,7 @@ public class MatchTacticsService {
     private final PlayerStatsService playerStatsService;
     private final PlayerSeasonRepository playerSeasonRepository;
     private final NotificationService notificationService;
+    private final RealtimeEventService realtimeEventService;
     private final UserRepository userRepository;
 
 //    public List<MatchTacticsResponse> getByMatch(Long matchId) {
@@ -141,6 +144,12 @@ public class MatchTacticsService {
         String matchName = buildMatchName(match);
 
         List<User> admins = userRepository.findUsersByRoleName("ROLE_ADMIN");
+        RealtimeEventDTO event = realtimeEvent(
+                existedBefore ? "LINEUP_UPDATED" : "LINEUP_SUBMITTED",
+                matchId,
+                "MATCH_LINEUP",
+                "REFETCH_LINEUPS"
+        );
 
         for (User admin : admins) {
             if (existedBefore) {
@@ -158,6 +167,8 @@ public class MatchTacticsService {
                         matchId
                 );
             }
+
+            realtimeEventService.sendToUser(admin.getId(), event);
         }
     }
 
@@ -191,6 +202,8 @@ public class MatchTacticsService {
         if (seasonId != null) {
             playerStatsService.recalculateBySeason(seasonId);
         }
+
+        sendLineupDeletedEventToAdmins(matchId);
     }
     private SystemRule getRequiredRule(Season season) {
         if (season == null) {
@@ -464,6 +477,38 @@ public class MatchTacticsService {
         if (seasonId != null) {
             playerStatsService.recalculateBySeason(seasonId);
         }
+
+        sendLineupDeletedEventToAdmins(matchId);
+    }
+
+    private void sendLineupDeletedEventToAdmins(Long matchId) {
+        List<User> admins = userRepository.findUsersByRoleName("ROLE_ADMIN");
+        RealtimeEventDTO event = realtimeEvent(
+                "LINEUP_DELETED",
+                matchId,
+                "MATCH_LINEUP",
+                "REFETCH_LINEUPS"
+        );
+
+        for (User admin : admins) {
+            realtimeEventService.sendToUser(admin.getId(), event);
+        }
+    }
+
+    private RealtimeEventDTO realtimeEvent(
+            String type,
+            Long referenceId,
+            String referenceType,
+            String action
+    ) {
+        return new RealtimeEventDTO(
+                type,
+                referenceId,
+                referenceType,
+                action,
+                null,
+                LocalDateTime.now()
+        );
     }
 
 

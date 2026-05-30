@@ -5,14 +5,21 @@ import com.example.demo.dao.match.MatchRepository;
 import com.example.demo.dao.player.PlayerRepository;
 import com.example.demo.dao.player.PlayerSeasonRepository;
 import com.example.demo.dao.team.TeamRepository;
+import com.example.demo.dao.user.UserRepository;
+import com.example.demo.dto.RealtimeEventDTO;
 import com.example.demo.dto.matchevent.MatchEventResponse;
 import com.example.demo.dto.matchevent.MatchEventUpsertRequest;
 import com.example.demo.entity.*;
+import com.example.demo.entity.user.User;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -24,6 +31,9 @@ public class MatchEventService {
     private final PlayerRepository playerRepository;
     private final PlayerStatsService playerStatsService;
     private final PlayerSeasonRepository playerSeasonRepository;
+    private final UserRepository userRepository;
+    private final RealtimeEventService realtimeEventService;
+    private final StandingService standingService;
 
 
     private SystemRule getRequiredRule(Season season) {
@@ -82,6 +92,7 @@ public class MatchEventService {
 
         playerStatsService.applyEvent(savedEvent, 1);
         recalculateMatchScore(matchId);
+        sendMatchEventRealtimeEvents(matchId);
 
         return toResponse(savedEvent);
     }
@@ -175,6 +186,7 @@ public class MatchEventService {
         playerStatsService.applyEvent(savedEvent, 1);
 
         recalculateMatchScore(matchId);
+        sendMatchEventRealtimeEvents(matchId);
         return toResponse(savedEvent);
     }
 
@@ -200,8 +212,9 @@ public class MatchEventService {
         }
 
         playerStatsService.applyEvent(event, -1);
-        recalculateMatchScore(matchId);
         matchEventRepository.delete(event);
+        recalculateMatchScore(matchId);
+        sendMatchEventRealtimeEvents(matchId);
     }
 
     private void applyRequest(MatchEvent event, MatchEventUpsertRequest request, Team team) {
@@ -354,6 +367,92 @@ public class MatchEventService {
         match.setAwayScore(awayScore);
 
         matchRepository.save(match);
+    }
+
+    private void sendMatchEventRealtimeEvents(Long matchId) {
+        Match match = matchRepository.findById(matchId)
+                .orElseThrow(() -> new RuntimeException("KhÃ´ng tÃ¬m tháº¥y tráº­n Ä‘áº¥u id = " + matchId));
+
+        Set<Long> userIds = findRelatedUserIds(match);
+
+        realtimeEventService.sendToUsers(
+                userIds,
+                realtimeEvent("MATCH_EVENT_CHANGED", matchId, "MATCH_EVENT", "REFETCH_MATCH_EVENTS")
+        );
+        realtimeEventService.sendToUsers(
+                userIds,
+                realtimeEvent("MATCH_SCORE_UPDATED", matchId, "MATCH", "REFETCH_MATCH_DETAIL")
+        );
+
+        if (match.getStatus() == MatchStatus.FINISHED && match.getSeason() != null) {
+            Long seasonId = match.getSeason().getId();
+            standingService.recalculateBySeason(seasonId);
+            realtimeEventService.sendToUsers(
+                    userIds,
+                    realtimeEvent("STANDING_UPDATED", seasonId, "STANDING", "REFETCH_STANDINGS")
+            );
+        }
+    }
+
+    private Set<Long> findRelatedUserIds(Match match) {
+        Set<Long> userIds = new LinkedHashSet<>();
+
+        userRepository.findUsersByRoleName("ROLE_ADMIN")
+                .stream()
+                .map(User::getId)
+                .forEach(userIds::add);
+
+        findClubManagerBySeasonTeam(match.getHomeTeam())
+                .map(User::getId)
+                .ifPresent(userIds::add);
+        findClubManagerBySeasonTeam(match.getAwayTeam())
+                .map(User::getId)
+                .ifPresent(userIds::add);
+
+        return userIds;
+    }
+
+    private Optional<User> findClubManagerBySeasonTeam(SeasonTeam seasonTeam) {
+        if (seasonTeam == null || seasonTeam.getTeam() == null) {
+            return Optional.empty();
+        }
+
+        Team team = seasonTeam.getTeam();
+
+        Optional<User> managerOpt =
+                userRepository.findClubManagerByTeamIdAndRoleName(
+                        team.getId(),
+                        "ROLE_CLUB_MANAGER"
+                );
+
+        if (managerOpt.isEmpty()) {
+            managerOpt = userRepository.findClubManagerByTeamIdAndRoleName(
+                    team.getId(),
+                    "CLUB_MANAGER"
+            );
+        }
+
+        if (managerOpt.isEmpty()) {
+            managerOpt = userRepository.findFirstByTeamId(team.getId());
+        }
+
+        return managerOpt;
+    }
+
+    private RealtimeEventDTO realtimeEvent(
+            String type,
+            Long referenceId,
+            String referenceType,
+            String action
+    ) {
+        return new RealtimeEventDTO(
+                type,
+                referenceId,
+                referenceType,
+                action,
+                null,
+                LocalDateTime.now()
+        );
     }
 
     private void validatePlayerBelongsToTeam(Player player, Team team) {

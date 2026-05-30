@@ -5,16 +5,19 @@ import com.example.demo.dao.registerteam.RegistrationTeamRepository;
 import com.example.demo.dao.season.SeasonTeamCoachRepository;
 import com.example.demo.dao.season.SeasonTeamRepository;
 import com.example.demo.dao.user.UserRepository;
+import com.example.demo.dto.RealtimeEventDTO;
 import com.example.demo.entity.*;
 import com.example.demo.entity.registerclub.*;
 import com.example.demo.entity.user.User;
 import com.example.demo.service.NotificationService;
+import com.example.demo.service.RealtimeEventService;
 import com.example.demo.service.StandingService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.Period;
 import java.util.HashSet;
 import java.util.List;
@@ -32,6 +35,7 @@ public class AdminApprovalService {
     private final StandingService standingService;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
+    private final RealtimeEventService realtimeEventService;
 
     @Transactional
     public void approveRegistration(Long registrationId) {
@@ -105,8 +109,10 @@ public class AdminApprovalService {
 
         reg.setStatus(RegistrationStatus.APPROVED);
 
-        notifyClubAboutRegistrationResult(reg, true, null);
-        registrationTeamRepository.save(reg);
+        RegistrationTeam savedRegistration = registrationTeamRepository.save(reg);
+        notifyClubAboutRegistrationResult(savedRegistration, true, null);
+        sendRegistrationResultEvents(savedRegistration, true);
+        sendTeamSeasonUpdatedEventToClubManager(savedRegistration);
     }
     private void validateNoDuplicateShirtNumbers(RegistrationTeam reg) {
         if (reg.getPlayers() == null || reg.getPlayers().isEmpty()) {
@@ -248,9 +254,9 @@ public class AdminApprovalService {
         reg.setStatus(RegistrationStatus.REJECTED);
         reg.setRejectionReason(reason);
 
-        notifyClubAboutRegistrationResult(reg, false, reason);
-
-        registrationTeamRepository.save(reg);
+        RegistrationTeam savedRegistration = registrationTeamRepository.save(reg);
+        notifyClubAboutRegistrationResult(savedRegistration, false, reason);
+        sendRegistrationResultEvents(savedRegistration, false);
     }
 
 
@@ -305,5 +311,85 @@ public class AdminApprovalService {
                     reason
             );
         }
+    }
+
+    private void sendRegistrationResultEvents(RegistrationTeam registration, boolean approved) {
+        String type = approved ? "REGISTRATION_APPROVED" : "REGISTRATION_REJECTED";
+        RealtimeEventDTO event = realtimeEvent(
+                type,
+                registration.getId(),
+                "REGISTRATION_TEAM",
+                "REFETCH_REGISTRATIONS"
+        );
+
+        findClubManagerByRegistration(registration)
+                .map(User::getId)
+                .ifPresent(userId -> realtimeEventService.sendToUser(userId, event));
+
+        sendEventToAdmins(event);
+    }
+
+    private void sendTeamSeasonUpdatedEventToClubManager(RegistrationTeam registration) {
+        if (registration == null || registration.getTeam() == null) {
+            return;
+        }
+
+        RealtimeEventDTO event = realtimeEvent(
+                "TEAM_SEASON_UPDATED",
+                registration.getTeam().getId(),
+                "TEAM_SEASON",
+                "REFETCH_TEAM_SEASON"
+        );
+
+        findClubManagerByRegistration(registration)
+                .map(User::getId)
+                .ifPresent(userId -> realtimeEventService.sendToUser(userId, event));
+    }
+
+    private void sendEventToAdmins(RealtimeEventDTO event) {
+        List<User> admins = userRepository.findUsersByRoleName("ROLE_ADMIN");
+
+        for (User admin : admins) {
+            realtimeEventService.sendToUser(admin.getId(), event);
+        }
+    }
+
+    private Optional<User> findClubManagerByRegistration(RegistrationTeam registration) {
+        if (registration == null || registration.getTeam() == null) {
+            return Optional.empty();
+        }
+
+        Team team = registration.getTeam();
+
+        Optional<User> managerOpt =
+                userRepository.findClubManagerByTeamIdAndRoleName(
+                        team.getId(),
+                        "ROLE_CLUB_MANAGER"
+                );
+
+        if (managerOpt.isEmpty()) {
+            managerOpt = userRepository.findClubManagerByTeamIdAndRoleName(
+                    team.getId(),
+                    "CLUB_MANAGER"
+            );
+        }
+
+        return managerOpt;
+    }
+
+    private RealtimeEventDTO realtimeEvent(
+            String type,
+            Long referenceId,
+            String referenceType,
+            String action
+    ) {
+        return new RealtimeEventDTO(
+                type,
+                referenceId,
+                referenceType,
+                action,
+                null,
+                LocalDateTime.now()
+        );
     }
 }

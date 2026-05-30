@@ -170,4 +170,9 @@ public class MatchController {
         );
     }
 
+    @PostMapping("/{matchId}/predict")
+    public MatchDTO predictMatchScore(@PathVariable Long matchId) {
+        return matchService.predictMatchScore(matchId);
+    }
+
 }

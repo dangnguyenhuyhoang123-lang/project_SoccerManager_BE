@@ -20,4 +20,6 @@ public class MatchDTO {
     private TeamDTO homeTeam;
     private TeamDTO awayTeam;
     private SeasonDTO season;
+    private Integer predictedHomeScore;
+    private Integer predictedAwayScore;
 }
