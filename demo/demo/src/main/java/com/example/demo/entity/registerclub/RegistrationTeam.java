@@ -4,6 +4,8 @@ import com.example.demo.entity.*;
 import jakarta.persistence.*;
 import lombok.Data;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Entity
@@ -54,4 +56,18 @@ public class RegistrationTeam extends BaseEntity {
 
     @Column
     private String note;
+
+
+    @Column(name = "fee_amount")
+    private BigDecimal feeAmount;
+
+    @Column(name = "fee_status")
+    @Enumerated(EnumType.STRING)
+    private FeeStatus feeStatus; // UNPAID, PAID, WAIVED
+
+    @Column(name = "payment_proof_url")
+    private String paymentProofUrl;
+
+    @Column(name = "paid_at")
+    private LocalDateTime paidAt;
 }

@@ -71,6 +71,11 @@ public class RegistrationService {
         if (!"ACTIVE".equalsIgnoreCase(rule.getStatus())) {
             throw new RuntimeException("Bộ luật của mùa giải đang tạm ngưng");
         }
+
+        if (!"VIETNAM".equalsIgnoreCase(dto.getTeamInfo().getOrganizationCountry())
+                && !"VIỆT NAM".equalsIgnoreCase(dto.getTeamInfo().getOrganizationCountry())) {
+            throw new RuntimeException("Cơ quan chủ quản phải nằm tại Việt Nam");
+        }
         // 1. Kiểm tra hình dáng DTO
         validateRequestShape(dto);
 

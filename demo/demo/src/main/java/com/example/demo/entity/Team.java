@@ -71,6 +71,18 @@ public class Team extends BaseEntity{
     @OneToMany(mappedBy = "team")
     private List<SeasonTeam> participatingSeasons = new ArrayList<>();
 
+    @Column(name = "managing_organization")
+    private String managingOrganization;
+
+    @Column(name = "organization_country")
+    private String organizationCountry;
+
+    @Column(name = "organization_address")
+    private String organizationAddress;
+
+    @Column(name = "business_license_no")
+    private String businessLicenseNo;
+
 
     @Column(name = "vpf_team_id", length = 100)
     private String vpfTeamId;

@@ -70,6 +70,10 @@ public class AdminApprovalService {
                 throw new RuntimeException("Mùa giải đã đạt số đội tối đa: " + rule.getMaxTeams());
             }
         }
+
+        if (reg.getFeeStatus() != FeeStatus.PAID) {
+            throw new RuntimeException("CLB chưa hoàn tất lệ phí tham gia giải");
+        }
         validateRegistrationPlayersByRule(reg, rule, season);
         validateNoDuplicateShirtNumbers(reg);
         validateCoaches(reg);
