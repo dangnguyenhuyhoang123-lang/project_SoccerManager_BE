@@ -5,13 +5,16 @@ import com.example.demo.dao.match.MatchRepository;
 import com.example.demo.dao.match.MatchTacticsRepository;
 import com.example.demo.dao.player.PlayerRepository;
 import com.example.demo.dao.player.PlayerSeasonRepository;
+import com.example.demo.dao.player.PlayerSuspensionRepository;
 import com.example.demo.dao.team.TeamRepository;
 import com.example.demo.dao.user.UserRepository;
 import com.example.demo.dto.RealtimeEventDTO;
 import com.example.demo.dto.lineups.*;
 import com.example.demo.entity.*;
+import com.example.demo.entity.team.Team;
 import com.example.demo.entity.user.User;
 import jakarta.transaction.Transactional;
+import lombok.AllArgsConstructor;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -32,6 +35,7 @@ public class MatchTacticsService {
     private final NotificationService notificationService;
     private final RealtimeEventService realtimeEventService;
     private final UserRepository userRepository;
+    private final PlayerSuspensionRepository playerSuspensionRepository;
 
 //    public List<MatchTacticsResponse> getByMatch(Long matchId) {
 //        return matchTacticsRepository.findByMatchId(matchId)
@@ -54,6 +58,9 @@ public class MatchTacticsService {
             Long teamId,
             MatchTacticsUpsertRequest request
     ) {
+        if (request == null) {
+            throw new RuntimeException("Dữ liệu đội hình không được để trống");
+        }
         Match match = matchRepository.findById(matchId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy trận đấu id = " + matchId));
 
@@ -62,13 +69,17 @@ public class MatchTacticsService {
 
         validateTeamBelongsToMatch(match, team);
         SystemRule rule = getRequiredRule(match.getSeason());
+
+
         validateNoDuplicatePlayers(request.getLineups());
 
-        validateStartingPlayers(request.getLineups());
 
+        validateStartingPlayers(request.getLineups());
+        validateForeignPlayersOnField(request.getLineups(), team, match.getSeason(), rule);
         validateLineupSizeByRule(request.getLineups(), rule);
 
         validateFormation(request.getFormationName(), request.getLineups());
+        validateMatchdaySquadSize(request.getLineups());
 
         for (MatchLineupRequest lineupRequest : request.getLineups()) {
             Player player = playerRepository.findById(lineupRequest.getPlayerId())
@@ -93,6 +104,8 @@ public class MatchTacticsService {
         tactics.setFormationName(request.getFormationName());
         tactics.setDescription(request.getDescription());
 
+
+
         MatchTactics savedTactics = matchTacticsRepository.save(tactics);
 
         matchLineupRepository.deleteByMatchTacticsId(savedTactics.getId());
@@ -104,6 +117,11 @@ public class MatchTacticsService {
                         .orElseThrow(() -> new RuntimeException(
                                 "Không tìm thấy cầu thủ id = " + lineupRequest.getPlayerId()
                         ));
+                PlayerSeason playerSeason = playerSeasonRepository
+                        .findByPlayerIdAndTeamIdAndSeasonId(player.getId(), team.getId(), match.getSeason().getId())
+                        .orElseThrow(() -> new RuntimeException("Không tìm thấy PlayerSeason hợp lệ"));
+
+                validatePlayerNotSuspended(player,match);
 
                 MatchLineup lineup = new MatchLineup();
                 lineup.setMatchTactics(savedTactics);
@@ -113,6 +131,7 @@ public class MatchTacticsService {
                 lineup.setIsStarting(Boolean.TRUE.equals(lineupRequest.getIsStarting()));
                 lineup.setLineupOrder(lineupRequest.getLineupOrder());
                 lineup.setRole(lineupRequest.getRole());
+                lineup.setPlayerSeason(playerSeason);
 
                 matchLineupRepository.save(lineup);
             }
@@ -222,6 +241,28 @@ public class MatchTacticsService {
 
         return rule;
     }
+
+    private void validateMatchdaySquadSize(List<MatchLineupRequest> lineups) {
+        if (lineups == null || lineups.isEmpty()) {
+            throw new RuntimeException("Danh sách đội hình không được để trống");
+        }
+
+        if (lineups.size() != 16) {
+            throw new RuntimeException("Danh sách đăng ký trận đấu phải có đúng 16 cầu thủ");
+        }
+
+        long startingCount = lineups.stream()
+                .filter(l -> Boolean.TRUE.equals(l.getIsStarting()))
+                .count();
+
+        long substituteCount = lineups.size() - startingCount;
+
+        if (startingCount != 11 || substituteCount != 5) {
+            throw new RuntimeException("Đội hình phải gồm 11 cầu thủ đá chính và 5 cầu thủ dự bị");
+        }
+    }
+
+
 
     private void validateStartingPlayers(List<MatchLineupRequest> lineups) {
         if (lineups == null || lineups.isEmpty()) {
@@ -536,5 +577,62 @@ public class MatchTacticsService {
                 home,
                 away
         );
+    }
+
+    private void validatePlayerNotSuspended(Player player, Match match) {
+        boolean suspended = playerSuspensionRepository
+                .existsByPlayerIdAndSuspendedMatchIdAndServedFalse(player.getId(), match.getId());
+
+        if (suspended) {
+            throw new RuntimeException("Cầu thủ " + player.getName() + " đang bị treo giò trận này");
+        }
+    }
+
+    private void validateForeignPlayersOnField(
+            List<MatchLineupRequest> lineups,
+            Team team,
+            Season season,
+            SystemRule rule
+    ) {
+        int maxForeignOnField = rule.getMaxForeignPlayersOnField() != null
+                ? rule.getMaxForeignPlayersOnField()
+                : 3;
+
+        long foreignStartingCount = 0;
+
+        for (MatchLineupRequest lineup : lineups) {
+            if (!Boolean.TRUE.equals(lineup.getIsStarting())) {
+                continue;
+            }
+
+            Player player = playerRepository.findById(lineup.getPlayerId())
+                    .orElseThrow(() -> new RuntimeException("Không tìm thấy cầu thủ id = " + lineup.getPlayerId()));
+
+            validatePlayerBelongsToTeamInSeason(player, team, season);
+
+            if (isForeignPlayer(player)) {
+                foreignStartingCount++;
+            }
+        }
+
+        if (foreignStartingCount > maxForeignOnField) {
+            throw new RuntimeException(
+                    "Số cầu thủ ngoại trong đội hình đá chính vượt quá giới hạn: "
+                            + maxForeignOnField
+            );
+        }
+    }
+
+    private boolean isForeignPlayer(Player player) {
+        if (player == null || player.getNationality() == null) {
+            return false;
+        }
+
+        String nationality = player.getNationality().trim().toLowerCase();
+
+        return !nationality.equals("việt nam")
+                && !nationality.equals("viet nam")
+                && !nationality.equals("vietnam")
+                && !nationality.equals("vn");
     }
 }

@@ -12,7 +12,7 @@ import com.example.demo.entity.Match;
 import com.example.demo.entity.MatchLineup;
 import com.example.demo.entity.MatchTactics;
 import com.example.demo.entity.Player;
-import com.example.demo.entity.Team;
+import com.example.demo.entity.team.Team;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.rest.webmvc.ResourceNotFoundException;

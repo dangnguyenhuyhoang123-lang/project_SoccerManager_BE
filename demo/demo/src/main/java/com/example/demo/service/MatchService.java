@@ -6,6 +6,8 @@ import com.example.demo.dao.match.MatchEventRepository;
 import com.example.demo.dao.match.MatchLineupRepository;
 import com.example.demo.dao.match.MatchRepository;
 import com.example.demo.dao.match.MatchStatsRepository;
+import com.example.demo.dao.player.PlayerRepository;
+import com.example.demo.dao.player.PlayerSeasonRepository;
 import com.example.demo.dao.season.SeasonRepository;
 import com.example.demo.dao.season.SeasonTeamRepository;
 import com.example.demo.dao.team.TeamRepository;
@@ -13,6 +15,7 @@ import com.example.demo.dao.user.UserRepository;
 import com.example.demo.dto.*;
 import com.example.demo.dto.aipredict.MatchPredictResponse;
 import com.example.demo.entity.*;
+import com.example.demo.entity.team.Team;
 import com.example.demo.entity.user.User;
 import com.example.demo.service.ai.MatchPredictionService;
 import jakarta.transaction.Transactional;
@@ -28,9 +31,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.LinkedHashSet;
-import java.util.Optional;
-import java.util.Set;
+import java.util.*;
 
 @Service
 @AllArgsConstructor
@@ -73,6 +74,10 @@ public class MatchService {
 
     private final MatchPredictionService matchPredictionService;
 
+    private  final PlayerSuspensionService playerSuspensionService;
+
+    private final PlayerRepository playerRepository;
+    private final PlayerSeasonRepository playerSeasonRepository;
 
 
 //    public MatchDTO getMatchById(Long id) {
@@ -92,22 +97,33 @@ public class MatchService {
         return toDTO(match);
     }
 
-    public Page<MatchDTO> getAllMatches(int page, int size, String status, String search) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by("matchDate").descending());
+    public Page<MatchDTO> getAllMatches(
+            Pageable pageable,
+            String status,
+            String search,
+            Long seasonId,
+            Integer roundId,
+            Long teamId
+    ) {
+        MatchStatus matchStatus = null;
 
-        boolean noStatus = (status == null || status.isBlank());
-        boolean noSearch = (search == null || search.isBlank());
-
-        if (noStatus && noSearch) {
-            return matchRepository.findAll(pageable)
-                    .map(this::toDTO);
+        if (status != null && !status.isBlank()) {
+            matchStatus = MatchStatus.valueOf(status);
         }
 
-        MatchStatus finalStatus = noStatus ? null : MatchStatus.valueOf(status.trim().toUpperCase());
-        String finalSearch = noSearch ? "" : search;
-
-        return matchRepository.filterMatches(finalStatus, finalSearch, pageable)
+        return matchRepository.searchMatches(
+                        matchStatus,
+                        normalize(search),
+                        seasonId,
+                        roundId,
+                        teamId,
+                        pageable
+                )
                 .map(this::toDTO);
+    }
+
+    private String normalize(String value) {
+        return value == null || value.isBlank() ? null : value.trim().toLowerCase();
     }
 
     @Transactional
@@ -288,6 +304,7 @@ public class MatchService {
 
         validateMatchRequest(request);
 
+
         SeasonTeam homeTeam = seasonTeamRepository.findById(request.getHomeTeamId())
                 .orElseThrow(() -> new RuntimeException("Home team not found with id = " + request.getHomeTeamId()));
         SeasonTeam awayTeam = seasonTeamRepository.findById(request.getAwayTeamId())
@@ -298,6 +315,14 @@ public class MatchService {
                 .orElseThrow(() -> new RuntimeException("Round not found with id = " + request.getRoundId()));
 
 
+        validateMatchScheduleConstraints(
+                match,
+                season,
+                round,
+                homeTeam,
+                awayTeam,
+                request.getMatchDate()
+        );
 
         if (season.getSystemRule() == null) {
             throw new RuntimeException("Mùa giải chưa được cấu hình bộ luật, không thể tạo trận đấu");
@@ -388,6 +413,14 @@ public class MatchService {
 
         if (savedMatch.getStatus() == MatchStatus.FINISHED
                 && savedMatch.getSeason() != null) {
+
+            // 1. Nếu trận này là trận mà cầu thủ bị treo giò, đánh dấu án đã chấp hành xong.
+            playerSuspensionService.markSuspensionsServedAfterMatch(savedMatch.getId());
+
+            // 2. Dựa vào thẻ phạt trong trận này, tạo án treo giò cho trận kế tiếp.
+            playerSuspensionService.generateSuspensionsAfterMatch(savedMatch.getId());
+
+            // 3. Tính lại bảng xếp hạng.
             standingService.recalculateBySeason(savedMatch.getSeason().getId());
         }
 
@@ -521,12 +554,206 @@ public class MatchService {
                 match.getMatchDate(),
                 toStadiumDto(match.getStadium()),
                 toRoundDto(match.getRound()),
-                toTeamDto(match.getHomeTeam().getTeam()),
-                toTeamDto(match.getAwayTeam().getTeam()),
+                match.getHomeTeam() != null ? toTeamDto(match.getHomeTeam().getTeam()) : null,
+                match.getAwayTeam() != null ? toTeamDto(match.getAwayTeam().getTeam()) : null,
                 toSeasonDto(match.getSeason()),
-                match.getPredictedHomeScore() != null ? match.getPredictedHomeScore() : null,
-                match.getPredictedAwayScore() != null ? match.getPredictedAwayScore() : null
+                match.getPredictedHomeScore(),
+                match.getPredictedAwayScore(),
+                match.getManOfTheMatch() != null ? match.getManOfTheMatch().getId() : null,
+                match.getManOfTheMatch() != null ? match.getManOfTheMatch().getName() : null
         );
+    }
+
+    @Transactional
+    public MatchDTO updateManOfTheMatch(Long matchId, Long playerId) {
+        Match match = matchRepository.findById(matchId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy trận đấu id = " + matchId));
+
+        if (match.getSeason() == null) {
+            throw new RuntimeException("Trận đấu chưa gắn mùa giải");
+        }
+
+        if (match.getHomeTeam() == null || match.getAwayTeam() == null) {
+            throw new RuntimeException("Trận đấu thiếu thông tin đội bóng");
+        }
+
+        Player player = playerRepository.findById(playerId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy cầu thủ id = " + playerId));
+
+        Long seasonId = match.getSeason().getId();
+        Long homeTeamId = match.getHomeTeam().getTeam().getId();
+        Long awayTeamId = match.getAwayTeam().getTeam().getId();
+
+        boolean belongsToHome = playerSeasonRepository.existsByPlayerTeamSeason(
+                playerId,
+                homeTeamId,
+                seasonId
+        );
+
+        boolean belongsToAway = playerSeasonRepository.existsByPlayerTeamSeason(
+                playerId,
+                awayTeamId,
+                seasonId
+        );
+
+        if (!belongsToHome && !belongsToAway) {
+            throw new RuntimeException("Cầu thủ không thuộc hai đội thi đấu trong mùa giải này");
+        }
+
+        match.setManOfTheMatch(player);
+
+        Match savedMatch = matchRepository.save(match);
+
+        sendMatchEventToRelatedClubManagers(
+                savedMatch,
+                realtimeEvent("MATCH_UPDATED", savedMatch.getId(), "MATCH", "REFETCH_MATCHES")
+        );
+
+        return toDTO(savedMatch);
+    }
+
+    @Transactional
+    public List<MatchDTO> generateDoubleRoundRobinSchedule(
+            Long seasonId,
+            ScheduleGenerateRequest request
+    ) {
+        Season season = seasonRepository.findById(seasonId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy mùa giải id = " + seasonId));
+
+        List<SeasonTeam> teams = seasonTeamRepository.findBySeasonIdAndStatus(seasonId, "ACTIVE");
+
+        if (teams.size() % 2 != 0) {
+            throw new RuntimeException("Số đội phải là số chẵn để sinh lịch vòng tròn");
+        }
+
+        int n = teams.size();
+        int roundsPerLeg = n - 1;
+        int matchesPerRound = n / 2;
+
+        LocalDateTime startDate = request.getFirstMatchDate();
+        if (startDate == null) {
+            throw new RuntimeException("Ngày bắt đầu lịch thi đấu không được để trống");
+        }
+
+        // nếu đã có match trong mùa thì chặn để tránh tạo trùng
+        if (matchRepository.existsBySeasonId(seasonId)) {
+            throw new RuntimeException("Mùa giải đã có lịch thi đấu, không thể sinh tự động");
+        }
+
+        List<SeasonTeam> rotation = new ArrayList<>(teams);
+        List<Match> createdMatches = new ArrayList<>();
+
+        for (int roundIndex = 0; roundIndex < roundsPerLeg; roundIndex++) {
+            Round round = ensureRound(season, roundIndex + 1, matchesPerRound);
+
+            for (int i = 0; i < matchesPerRound; i++) {
+                SeasonTeam teamA = rotation.get(i);
+                SeasonTeam teamB = rotation.get(n - 1 - i);
+
+                boolean swapHome = roundIndex % 2 == 1;
+
+                SeasonTeam home = swapHome ? teamB : teamA;
+                SeasonTeam away = swapHome ? teamA : teamB;
+
+                Match match = buildGeneratedMatch(
+                        season,
+                        round,
+                        home,
+                        away,
+                        startDate.plusDays((long) roundIndex * request.getDaysBetweenRounds())
+                );
+
+                createdMatches.add(matchRepository.save(match));
+            }
+
+            rotateTeams(rotation);
+        }
+
+        // lượt về: đảo sân nhà/sân khách
+        for (int roundIndex = 0; roundIndex < roundsPerLeg; roundIndex++) {
+            Round round = ensureRound(season, roundsPerLeg + roundIndex + 1, matchesPerRound);
+
+            List<Match> firstLegRoundMatches = createdMatches.subList(
+                    roundIndex * matchesPerRound,
+                    roundIndex * matchesPerRound + matchesPerRound
+            );
+
+            for (Match firstLeg : firstLegRoundMatches) {
+                Match secondLeg = buildGeneratedMatch(
+                        season,
+                        round,
+                        firstLeg.getAwayTeam(),
+                        firstLeg.getHomeTeam(),
+                        startDate.plusDays((long) (roundsPerLeg + roundIndex) * request.getDaysBetweenRounds())
+                );
+
+                createdMatches.add(matchRepository.save(secondLeg));
+            }
+        }
+
+        return createdMatches.stream().map(this::toDTO).toList();
+    }
+    private void rotateTeams(List<SeasonTeam> teams) {
+        if (teams.size() <= 2) return;
+
+        SeasonTeam fixed = teams.get(0);
+        SeasonTeam last = teams.remove(teams.size() - 1);
+        teams.add(1, last);
+        teams.set(0, fixed);
+    }
+
+    private Match buildGeneratedMatch(
+            Season season,
+            Round round,
+            SeasonTeam home,
+            SeasonTeam away,
+            LocalDateTime matchDate
+    ) {
+        Match match = new Match();
+        match.setSeason(season);
+        match.setRound(round);
+        match.setHomeTeam(home);
+        match.setAwayTeam(away);
+        match.setMatchDate(matchDate);
+        match.setStatus(MatchStatus.SCHEDULED);
+
+        if (home.getTeam() != null && home.getTeam().getStadium() != null) {
+            match.setStadium(home.getTeam().getStadium());
+        }
+
+        return match;
+    }
+    private Round ensureRound(Season season, int roundNumber, int maxMatches) {
+        return roundRepository.findBySeasonIdAndRoundNumber(season.getId(), roundNumber)
+                .orElseGet(() -> {
+                    Round round = new Round();
+                    round.setSeason(season);
+                    round.setRoundNumber(roundNumber);
+                    round.setName("Vòng " + roundNumber);
+                    round.setMaxMatches(maxMatches);
+                    return roundRepository.save(round);
+                });
+    }
+
+
+    public List<ManOfTheMatchStatsResponse> getManOfTheMatchStats(Long seasonId) {
+        if (seasonId == null || seasonId <= 0) {
+            throw new RuntimeException("seasonId không hợp lệ");
+        }
+
+        if (!seasonRepository.existsById(seasonId)) {
+            throw new RuntimeException("Không tìm thấy mùa giải id = " + seasonId);
+        }
+
+        return matchRepository.countManOfTheMatchBySeason(seasonId)
+                .stream()
+                .map(row -> new ManOfTheMatchStatsResponse(
+                        ((Number) row[0]).longValue(),
+                        (String) row[1],
+                        seasonId,
+                        ((Number) row[2]).longValue()
+                ))
+                .toList();
     }
 
     private TeamDTO toTeamDto(Team team) {
@@ -609,14 +836,14 @@ public class MatchService {
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy trận đấu"));
 
         // Chỉ cho dự đoán trận chưa diễn ra
-        if (match.getStatus() != MatchStatus.SCHEDULED) {
-            throw new RuntimeException("Chỉ có thể dự đoán trận đấu chưa diễn ra");
-        }
+//        if (match.getStatus() != MatchStatus.SCHEDULED) {
+//            throw new RuntimeException("Chỉ có thể dự đoán trận đấu chưa diễn ra");
+//        }
 
         // Nếu đã có tỉ số thật thì không cho dự đoán nữa
-        if (match.getHomeScore() != null || match.getAwayScore() != null) {
-            throw new RuntimeException("Trận đấu đã có tỉ số thật, không thể dự đoán");
-        }
+//        if (match.getHomeScore() != null || match.getAwayScore() != null) {
+//            throw new RuntimeException("Trận đấu đã có tỉ số thật, không thể dự đoán");
+//        }
 
         SeasonTeam homeSeasonTeam = match.getHomeTeam();
         SeasonTeam awaySeasonTeam = match.getAwayTeam();
@@ -665,5 +892,74 @@ public class MatchService {
         Match savedMatch = matchRepository.save(match);
 
         return toDTO(savedMatch);
+    }
+
+
+    private void validateMatchScheduleConstraints(
+            Match currentMatch,
+            Season season,
+            Round round,
+            SeasonTeam homeTeam,
+            SeasonTeam awayTeam,
+            LocalDateTime matchDate
+    ) {
+        Long currentMatchId = currentMatch.getId();
+
+        // 1. Một đội không đá 2 trận trong cùng vòng
+        boolean homeBusyInRound = matchRepository.existsTeamInRound(
+                round.getId(),
+                homeTeam.getId(),
+                currentMatchId
+        );
+
+        boolean awayBusyInRound = matchRepository.existsTeamInRound(
+                round.getId(),
+                awayTeam.getId(),
+                currentMatchId
+        );
+
+        if (homeBusyInRound) {
+            throw new RuntimeException("Đội chủ nhà đã có trận trong vòng này");
+        }
+
+        if (awayBusyInRound) {
+            throw new RuntimeException("Đội khách đã có trận trong vòng này");
+        }
+
+        // 2. Một cặp đội không được gặp nhau quá 2 lần
+        long pairCount = matchRepository.countMatchesBetweenTwoSeasonTeams(
+                season.getId(),
+                homeTeam.getId(),
+                awayTeam.getId(),
+                currentMatchId
+        );
+
+        if (pairCount >= 2) {
+            throw new RuntimeException("Hai đội này đã gặp nhau đủ 2 lượt trong mùa giải");
+        }
+
+        // 3. Không trùng chính xác cùng cặp sân nhà/sân khách
+        boolean sameDirectionExists = matchRepository.existsSameHomeAwayPair(
+                season.getId(),
+                homeTeam.getId(),
+                awayTeam.getId(),
+                currentMatchId
+        );
+
+        if (sameDirectionExists) {
+            throw new RuntimeException("Lượt đấu này đã tồn tại. Lượt về phải đảo sân nhà/sân khách");
+        }
+
+        // 4. Một round không vượt quá số trận tối đa
+        Integer maxMatches = round.getMaxMatches() != null ? round.getMaxMatches() : 5;
+
+        long matchCountInRound = matchRepository.countByRoundIdExcludingCurrent(
+                round.getId(),
+                currentMatchId
+        );
+
+        if (matchCountInRound >= maxMatches) {
+            throw new RuntimeException("Vòng đấu đã đạt số trận tối đa: " + maxMatches);
+        }
     }
 }

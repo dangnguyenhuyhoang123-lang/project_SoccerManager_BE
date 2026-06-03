@@ -1,11 +1,12 @@
 package com.example.demo.entity;
 
 import com.example.demo.entity.registerclub.RegistrationTeam;
+import com.example.demo.entity.team.Team;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import java.util.ArrayList;
+
 import java.util.List;
 @Entity
 @Table(

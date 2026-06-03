@@ -6,7 +6,7 @@ import com.example.demo.dao.user.UserRepository;
 import com.example.demo.dto.user.CreateUserRequest;
 import com.example.demo.dto.user.UpdateUserInfoRequest;
 import com.example.demo.dto.user.UserDTO;
-import com.example.demo.entity.Team;
+import com.example.demo.entity.team.Team;
 import com.example.demo.entity.message.ErrorMessage;
 import com.example.demo.entity.user.Role;
 import com.example.demo.entity.user.User;

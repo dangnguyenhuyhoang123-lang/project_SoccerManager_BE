@@ -4,8 +4,11 @@ import com.example.demo.entity.EventType;
 import com.example.demo.entity.MatchEvent;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 
@@ -48,4 +51,19 @@ public interface MatchEventRepository extends JpaRepository<MatchEvent,Long> {
     List<MatchEvent> findByMatchSeasonIdOrderByMatchIdAscMinuteAscIdAsc(Long seasonId);
 
     List<MatchEvent> findByMatchId(Long matchId);
+
+    @Query("""
+    SELECT COUNT(e)
+    FROM MatchEvent e
+    WHERE e.match.season.id = :seasonId
+      AND e.player.id = :playerId
+      AND e.eventType = :eventType
+      AND e.match.matchDate <= :untilMatchDate
+""")
+    long countPlayerEventsInSeasonUntil(
+            @Param("seasonId") Long seasonId,
+            @Param("playerId") Long playerId,
+            @Param("eventType") EventType eventType,
+            @Param("untilMatchDate") LocalDateTime untilMatchDate
+    );
 }

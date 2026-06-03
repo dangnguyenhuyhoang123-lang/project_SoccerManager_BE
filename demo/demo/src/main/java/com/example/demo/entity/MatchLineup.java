@@ -29,6 +29,10 @@ public class MatchLineup {
     @JoinColumn(name = "player_id", nullable = false)
     private Player player;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "player_season_id")
+    private PlayerSeason playerSeason;
+
     // vị trí thi đấu trên sân (string hoặc chuẩn hóa)
     @Column
     private String position;

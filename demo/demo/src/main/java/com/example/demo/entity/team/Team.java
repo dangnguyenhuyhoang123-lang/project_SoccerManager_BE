@@ -1,5 +1,6 @@
-package com.example.demo.entity;
+package com.example.demo.entity.team;
 
+import com.example.demo.entity.*;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -16,11 +17,10 @@ import java.util.List;
                 @Index(name = "idx_team_status", columnList = "status")
         }
 )
-public class Team extends BaseEntity{
+public class Team extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column
     private Long id;
 
     @Column(nullable = false)

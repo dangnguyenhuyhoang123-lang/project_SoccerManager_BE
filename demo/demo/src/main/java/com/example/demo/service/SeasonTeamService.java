@@ -7,7 +7,7 @@ import com.example.demo.dao.season.SeasonTeamRepository;
 import com.example.demo.dao.team.TeamRepository;
 import com.example.demo.entity.Season;
 import com.example.demo.entity.SeasonTeam;
-import com.example.demo.entity.Team;
+import com.example.demo.entity.team.Team;
 import com.example.demo.entity.registerclub.RegistrationTeam;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;

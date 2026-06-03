@@ -2,7 +2,7 @@ package com.example.demo.entity.user;
 
 
 import com.example.demo.entity.Referee;
-import com.example.demo.entity.Team;
+import com.example.demo.entity.team.Team;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.EqualsAndHashCode;

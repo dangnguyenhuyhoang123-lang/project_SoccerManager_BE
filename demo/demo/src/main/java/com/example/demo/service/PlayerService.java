@@ -3,9 +3,10 @@ package com.example.demo.service;
 import com.example.demo.dao.player.PlayerRepository;
 import com.example.demo.dao.team.TeamRepository;
 import com.example.demo.dto.PlayerDTO;
+import com.example.demo.dto.PlayerSearchResponse;
 import com.example.demo.dto.PlayerUpsertDTO;
 import com.example.demo.entity.Player;
-import com.example.demo.entity.Team;
+import com.example.demo.entity.team.Team;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -13,6 +14,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.rest.webmvc.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 @Service
 public class PlayerService {
@@ -53,6 +56,26 @@ public class PlayerService {
 
         return playerRepository.findByTeamId(teamID,pageable)
                 .map(this::toDto);
+    }
+    public List<PlayerSearchResponse> searchPlayers(
+            Long seasonId,
+            Long teamId,
+            String keyword,
+            String playerType
+    ) {
+        String normalizedKeyword =
+                keyword == null || keyword.isBlank() ? null : keyword.trim().toLowerCase();
+
+        List<PlayerSearchResponse> result =
+                playerRepository.searchPlayersFromPlayer(seasonId, teamId, normalizedKeyword);
+
+        if (playerType == null || playerType.isBlank()) {
+            return result;
+        }
+
+        return result.stream()
+                .filter(p -> playerType.equalsIgnoreCase(p.getPlayerType()))
+                .toList();
     }
 
     public PlayerDTO save(PlayerUpsertDTO request)

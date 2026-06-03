@@ -9,6 +9,7 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -146,9 +147,43 @@ public class PlayerStatsService {
         }
     }
 
+    public List<PlayerStatsResponse> getTopScorers(Long seasonId) {
+        if (seasonId == null || seasonId <= 0) {
+            throw new RuntimeException("seasonId không hợp lệ");
+        }
+
+        if (!seasonRepository.existsById(seasonId)) {
+            throw new RuntimeException("Không tìm thấy mùa giải id = " + seasonId);
+        }
+
+        return playerStatsRepository.findTopScorersBySeasonId(seasonId)
+                .stream()
+                .map(this::toResponse)
+                .toList();
+    }
+
+    public List<PlayerStatsResponse> getCards(Long seasonId) {
+        if (seasonId == null || seasonId <= 0) {
+            throw new RuntimeException("seasonId không hợp lệ");
+        }
+
+        return playerStatsRepository.findBySeasonId(seasonId)
+                .stream()
+                .filter(ps -> safe(ps.getYellowCards()) > 0 || safe(ps.getRedCards()) > 0)
+                .sorted(
+                        Comparator
+                                .comparing((PlayerStats ps) -> safe(ps.getRedCards())).reversed()
+                                .thenComparing(ps -> safe(ps.getYellowCards()), Comparator.reverseOrder())
+                )
+                .map(this::toResponse)
+                .toList();
+    }
+
     private int safe(Integer value) {
         return value == null ? 0 : value;
     }
+
+
 
     private PlayerStatsResponse toResponse(PlayerStats stats) {
         Player player = stats.getPlayer();
@@ -157,6 +192,8 @@ public class PlayerStatsService {
                 stats.getId(),
                 stats.getSeason() != null ? stats.getSeason().getId() : null,
                 stats.getSeason() != null ? stats.getSeason().getName() : null,
+                player != null && player.getTeam() != null ? player.getTeam().getId() : null,
+                player != null && player.getTeam() != null ? player.getTeam().getName() : null,
                 player != null ? player.getId() : null,
                 player != null ? player.getName() : null,
                 stats.getGoals(),
@@ -172,6 +209,8 @@ public class PlayerStatsService {
             Long id,
             Long seasonId,
             String seasonName,
+            Long teamId,
+            String teamName,
             Long playerId,
             String playerName,
             Integer goals,

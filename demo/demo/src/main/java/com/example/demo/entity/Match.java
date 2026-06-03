@@ -97,6 +97,8 @@ public class Match extends  BaseEntity {
     @Column(name ="predict_away_score")
     private Integer predictedAwayScore;
 
-
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "man_of_the_match_player_id")
+    private Player manOfTheMatch;
 
 }

@@ -1,5 +1,6 @@
 package com.example.demo.dao.player;
 
+import com.example.demo.dto.PlayerSearchResponse;
 import com.example.demo.entity.Player;
 import com.example.demo.entity.PlayerSeason;
 import com.example.demo.entity.Season;
@@ -66,4 +67,9 @@ public interface PlayerSeasonRepository extends JpaRepository<PlayerSeason,Long>
             SeasonTeam teamSeason,
             Integer shirtNumber
     );
+
+    Optional<PlayerSeason> findByPlayerIdAndTeamIdAndSeasonId(Long playerId, Long teamId, Long seasonId);
+
+
+
 }

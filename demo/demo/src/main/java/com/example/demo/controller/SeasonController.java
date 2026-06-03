@@ -1,24 +1,28 @@
 package com.example.demo.controller;
 
+import com.example.demo.dto.MatchDTO;
+import com.example.demo.dto.ScheduleGenerateRequest;
 import com.example.demo.dto.SeasonDTO;
+import com.example.demo.service.MatchService;
 import com.example.demo.service.SeasonService;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.util.List;
 
+@RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/seasons")
 @CrossOrigin
 public class SeasonController {
 
-    private SeasonService seasonService;
+    private final SeasonService seasonService;
+    private final MatchService matchService;
 
-    @Autowired
-    public SeasonController(SeasonService seasonService) {
-        this.seasonService = seasonService;
-    }
+
 
     @GetMapping("/getAllSeasons")
     public Page<SeasonResponse> getSeasons(
@@ -60,6 +64,14 @@ public class SeasonController {
     @DeleteMapping("/deleteSeason/{id}")
     public void deleteSeason(@PathVariable Long id) {
         seasonService.delete(id);
+    }
+
+    @PostMapping("/{seasonId}/generate-schedule")
+    public List<MatchDTO> generateSchedule(
+            @PathVariable Long seasonId,
+            @RequestBody ScheduleGenerateRequest request
+    ) {
+        return matchService.generateDoubleRoundRobinSchedule(seasonId, request);
     }
 
     public record SeasonRequest(

@@ -26,4 +26,9 @@ public class SystemRuleRequest {
     private Integer maxSubstitution;
     private Integer minRegistrationPlayers;
     private Integer maxForeignPlayers;
+
+    private Integer maxForeignPlayersOnField;
+    private Integer maxGoalMinute;
+
+    private String rankingCriteriaOrder;
 }

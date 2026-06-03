@@ -1,5 +1,6 @@
-package com.example.demo.entity;
+package com.example.demo.entity.team;
 
+import com.example.demo.entity.Season;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;

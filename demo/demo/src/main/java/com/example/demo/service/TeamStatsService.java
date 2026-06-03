@@ -5,8 +5,9 @@ import com.example.demo.dao.season.SeasonRepository;
 import com.example.demo.dao.season.SeasonTeamRepository;
 import com.example.demo.dao.team.TeamStatsRepository;
 import com.example.demo.entity.*;
+import com.example.demo.entity.team.Team;
+import com.example.demo.entity.team.TeamStats;
 import jakarta.transaction.Transactional;
-import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 

@@ -22,4 +22,6 @@ public class MatchDTO {
     private SeasonDTO season;
     private Integer predictedHomeScore;
     private Integer predictedAwayScore;
+    private Long manOfTheMatchPlayerId;
+    private String manOfTheMatchPlayerName;
 }

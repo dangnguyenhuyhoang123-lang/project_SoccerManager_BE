@@ -20,110 +20,18 @@ public class MatchController {
     @Autowired
     private MatchService matchService;
 
-//    @GetMapping
-//    public List<MatchDTO> getAllMatches() {
-//        return matchService.getAllMatches();
-//    }
-//    @GetMapping
-//    public Page<MatchDTO> getMatches(Pageable pageable) {
-//        return matchService.getMatches(pageable);
-//    }
-//    @GetMapping
-//    public Page<MatchDTO> getMatchesByLeagueName(
-//            @RequestParam String leagueName,
-//            Pageable pageable
-//    ) {
-//        return matchService.getMatchesByLeague_Name(leagueName, pageable);
-//    }
-//
-//    @GetMapping
-//    public Page<MatchDTO> getMatchesBySession(
-//            @RequestParam String session,
-//            Pageable pageable
-//    ) {
-//        return matchService.getMatchesBySeason_Year(session, pageable);
-//    }
-//
-//    @GetMapping
-//    public Page<MatchDTO> getMatchesByLeagueNameAndSessionYear(
-//            @RequestParam String leagueName,
-//            @RequestParam String session,
-//            Pageable pageable
-//    ) {
-//        return matchService.getMatchesLeague_NameAndSeason_Year(leagueName,session, pageable);
-//    }
 
-//    @GetMapping
-//    public Page<MatchDTO> getMatches(
-//            @RequestParam(required = false) String leagueName,
-//            @RequestParam(required = false) String season,
-//            Pageable pageable
-//    ) {
-//        boolean hasLeague = hasText(leagueName);
-//        boolean hasSeason = hasText(season);
-//
-//        if (hasLeague && hasSeason) {
-//            return matchService.getMatchesLeague_NameAndSeason_Year(leagueName, season, pageable);
-//        }
-//
-//        if (hasLeague) {
-//            return matchService.getMatchesByLeague_Name(leagueName, pageable);
-//        }
-//
-//        if (hasSeason) {
-//            return matchService.getMatchesBySeason_Year(season, pageable);
-//        }
-//
-//        return matchService.getMatches(pageable);
-//    }
-//
-//    @GetMapping("/{id}")
-//    public MatchDTO getMatchById(@PathVariable Long id) {
-//        return matchService.getMatchById(id);
-//    }
-//
-//    @GetMapping("/{id}/stats")
-//    public MatchStatsDTO getStats(@PathVariable Long id) {
-//        return matchService.getMatchStats(id);
-//    }
-//
-//    @GetMapping("/{id}/list-event")
-//    public List<MatchEventDTO> getListEvemt(@PathVariable Long id)
-//    {
-//        return matchService.getEventsByMatch(id);
-//    }
-//
-//    @GetMapping("/{id}/lineup")
-//    public Page<LineUpDTO> getLineup(
-//            @PathVariable Long id,
-//            Pageable pageable
-//    ) {
-//        return matchService.getLineup(id, pageable);
-//    }
 
     @GetMapping("/getAllMatches")
     public Page<MatchDTO> getAllMatches(
             Pageable pageable,
             @RequestParam(required = false) String status,
-            @RequestParam(required = false) String search
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) Long seasonId,
+            @RequestParam(required = false) Integer roundId,
+            @RequestParam(required = false) Long teamId
     ) {
-        int MAX_SIZE = 50;
-
-        int size = Math.min(pageable.getPageSize(), MAX_SIZE);
-        Pageable safePageable = PageRequest.of(
-                pageable.getPageNumber(),
-                size,
-                pageable.getSort().isSorted()
-                        ? pageable.getSort()
-                        : Sort.by("matchDate").descending()
-        );
-
-        return matchService.getAllMatches(
-                safePageable.getPageNumber(),
-                safePageable.getPageSize(),
-                status,
-                search
-        );
+        return matchService.getAllMatches(pageable, status, search, seasonId, roundId, teamId);
     }
 
     @GetMapping("/{id}")
@@ -131,7 +39,12 @@ public class MatchController {
         return matchService.getMatchById(id);
     }
 
-
+    @GetMapping("/man-of-the-match-stats")
+    public List<ManOfTheMatchStatsResponse> getManOfTheMatchStats(
+            @RequestParam Long seasonId
+    ) {
+        return matchService.getManOfTheMatchStats(seasonId);
+    }
 
 
     @PostMapping("/addMatch")
@@ -152,6 +65,14 @@ public class MatchController {
             @RequestBody MatchStatusUpdateDTO request
     ) {
         return matchService.updateStatus(id, request);
+    }
+
+    @PatchMapping("/{matchId}/man-of-the-match/{playerId}")
+    public MatchDTO updateManOfTheMatch(
+            @PathVariable Long matchId,
+            @PathVariable Long playerId
+    ) {
+        return matchService.updateManOfTheMatch(matchId, playerId);
     }
 
     @DeleteMapping("/deleteMatch/{id}")

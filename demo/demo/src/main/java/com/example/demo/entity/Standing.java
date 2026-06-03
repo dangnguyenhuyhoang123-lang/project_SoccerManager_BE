@@ -1,5 +1,6 @@
 package com.example.demo.entity;
 
+import com.example.demo.entity.team.Team;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -52,6 +53,8 @@ public class Standing {
 
     @Column(name = "current_rank")
     private Integer currentRank;
+    @Column(name = "draw_lot_order")
+    private Integer drawLotOrder;
 
     @ManyToOne
     @JoinColumn(name = "team_id", nullable = false)

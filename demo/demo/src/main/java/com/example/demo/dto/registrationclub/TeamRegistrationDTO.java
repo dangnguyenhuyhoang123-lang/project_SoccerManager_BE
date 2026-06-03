@@ -20,4 +20,9 @@ public class TeamRegistrationDTO {
 
     private String businessLicenseNo;
     private String note;
+
+    private String homeKitColor;
+    private String awayKitColor;
+    private String homeKitImageUrl;
+    private String awayKitImageUrl;
 }

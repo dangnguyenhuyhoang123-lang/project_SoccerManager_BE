@@ -56,4 +56,13 @@ public class SystemRule {
 
     @Column(name = "max_foreign_players")
     private Integer maxForeignPlayers; // Mặc định là 3
+
+    @Column(name = "max_foreign_players_on_field")
+    private Integer maxForeignPlayersOnField;
+
+    @Column(name = "max_goal_minute")
+    private Integer maxGoalMinute;
+
+    @Column(name = "ranking_criteria_order")
+    private String rankingCriteriaOrder = "POINTS,GOAL_DIFFERENCE,HEAD_TO_HEAD,DRAW_LOT";
 }

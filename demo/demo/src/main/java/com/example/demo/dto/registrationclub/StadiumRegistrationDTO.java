@@ -19,4 +19,15 @@ public class StadiumRegistrationDTO {
 
 
     private GrassType grass;
+
+
+    private Integer fifaStarRating;
+
+    private String country;
+
+    private String city;
+
+    private String certificateUrl;
+
+
 }

@@ -1,11 +1,14 @@
 package com.example.demo.controller;
 
 import com.example.demo.dto.PlayerDTO;
+import com.example.demo.dto.PlayerSearchResponse;
 import com.example.demo.dto.PlayerUpsertDTO;
 import com.example.demo.service.PlayerService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/player")
@@ -42,6 +45,16 @@ public class PlayerController {
             @RequestParam(defaultValue = "10") int size
     ) {
         return playerService.getPlayersByTeam(teamID,page, size);
+    }
+
+    @GetMapping("/search")
+    public List<PlayerSearchResponse> searchPlayers(
+            @RequestParam(required = false) Long seasonId,
+            @RequestParam(required = false) Long teamId,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String playerType
+    ) {
+        return playerService.searchPlayers(seasonId, teamId, keyword, playerType);
     }
 
 

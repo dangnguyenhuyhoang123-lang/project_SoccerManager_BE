@@ -43,6 +43,16 @@ public class RegistrationController {
         return ResponseEntity.ok(Map.of("message", "Duyệt đơn đăng ký thành công"));
     }
 
+    @PatchMapping("/{id}/payment")
+    public ResponseEntity<RegistrationSummaryDTO> markRegistrationPaid(
+            @PathVariable Long id,
+            @RequestParam(required = false) String paymentProofUrl
+    ) {
+        return ResponseEntity.ok(
+                registrationService.markRegistrationPaid(id, paymentProofUrl)
+        );
+    }
+
     @PostMapping("/{id}/reject")
     public ResponseEntity<Map<String, String>> rejectRegistration(@PathVariable Long id,
                                                                   @RequestParam(required = false) String note) {

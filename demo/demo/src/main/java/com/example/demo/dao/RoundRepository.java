@@ -12,4 +12,5 @@ public interface RoundRepository extends JpaRepository<Round, Integer> {
     Page<Round> findBySeasonId(Long seasonId, Pageable pageable);
 
     Optional<Round> findBySeasonAndRoundNumber(Season season, Integer roundNumber);
+    Optional<Round> findBySeasonIdAndRoundNumber(Long seasonId, Integer roundNumber);
 }

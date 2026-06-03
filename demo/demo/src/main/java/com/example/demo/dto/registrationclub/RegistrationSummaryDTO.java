@@ -1,9 +1,11 @@
 package com.example.demo.dto.registrationclub;
 
+import com.example.demo.entity.registerclub.FeeStatus;
 import com.example.demo.entity.registerclub.RegistrationStatus;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 @Data
@@ -19,4 +21,8 @@ public class RegistrationSummaryDTO {
     private Integer coachCount;
     private LocalDateTime submittedAt;
     private String note;
+    private BigDecimal feeAmount;
+    private FeeStatus feeStatus;
+    private String paymentProofUrl;
+    private LocalDateTime paidAt;
 }

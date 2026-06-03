@@ -20,5 +20,5 @@ public interface StandingRepository extends JpaRepository<Standing,Long> {
 
     // Dùng để kiểm tra sự tồn tại trước khi khởi tạo
     boolean existsBySeasonIdAndTeamId(Long seasonId, Long teamId);
-
+    List<Standing> findBySeasonId(Long seasonId);
 }

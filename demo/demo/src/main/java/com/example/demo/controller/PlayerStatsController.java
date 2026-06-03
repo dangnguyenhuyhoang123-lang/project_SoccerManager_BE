@@ -27,4 +27,14 @@ public class PlayerStatsController {
     public List<PlayerStatsService.PlayerStatsResponse> getBySeason(@RequestParam Long seasonId) {
         return playerStatsService.getBySeason(seasonId);
     }
+
+    @GetMapping("/top-scorers")
+    public List<PlayerStatsService.PlayerStatsResponse> getTopScorers(@RequestParam Long seasonId) {
+        return playerStatsService.getTopScorers(seasonId);
+    }
+
+    @GetMapping("/cards")
+    public List<PlayerStatsService.PlayerStatsResponse> getCards(@RequestParam Long seasonId) {
+        return playerStatsService.getCards(seasonId);
+    }
 }

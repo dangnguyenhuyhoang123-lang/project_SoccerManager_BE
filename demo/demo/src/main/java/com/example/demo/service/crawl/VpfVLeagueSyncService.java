@@ -12,6 +12,7 @@ import com.example.demo.dao.season.SeasonTeamRepository;
 import com.example.demo.dao.team.TeamRepository;
 import com.example.demo.dto.crawl.*;
 import com.example.demo.entity.*;
+import com.example.demo.entity.team.Team;
 import com.example.demo.service.StandingService;
 import com.example.demo.service.TeamStatsService;
 import org.jsoup.Jsoup;

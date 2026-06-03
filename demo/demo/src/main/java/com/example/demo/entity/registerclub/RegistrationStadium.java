@@ -20,4 +20,13 @@ public class RegistrationStadium {
     @Enumerated(EnumType.STRING)
     @Column(name = "grass_type")
     private GrassType grass;
+
+    @Column
+    private String country;
+
+    @Column
+    private Integer fifaStarRating;
+
+    @Column
+    private String certificateUrl;
 }

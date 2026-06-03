@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -107,4 +108,142 @@ public interface MatchRepository extends JpaRepository<Match,Long> {
     WHERE m.id = :matchId
 """)
     Optional<Match> findMatchWithSeasonTeams(@Param("matchId") Long matchId);
+
+
+    @Query("""
+    SELECT COUNT(m) > 0
+    FROM Match m
+    WHERE m.round.id = :roundId
+      AND (:currentMatchId IS NULL OR m.id <> :currentMatchId)
+      AND (
+            m.homeTeam.id = :seasonTeamId
+         OR m.awayTeam.id = :seasonTeamId
+      )
+""")
+    boolean existsTeamInRound(
+            @Param("roundId") Integer roundId,
+            @Param("seasonTeamId") Long seasonTeamId,
+            @Param("currentMatchId") Long currentMatchId
+    );
+
+    @Query("""
+    SELECT COUNT(m)
+    FROM Match m
+    WHERE m.season.id = :seasonId
+      AND (:currentMatchId IS NULL OR m.id <> :currentMatchId)
+      AND (
+            (m.homeTeam.id = :teamAId AND m.awayTeam.id = :teamBId)
+         OR (m.homeTeam.id = :teamBId AND m.awayTeam.id = :teamAId)
+      )
+""")
+    long countMatchesBetweenTwoSeasonTeams(
+            @Param("seasonId") Long seasonId,
+            @Param("teamAId") Long teamAId,
+            @Param("teamBId") Long teamBId,
+            @Param("currentMatchId") Long currentMatchId
+    );
+
+    @Query("""
+    SELECT COUNT(m) > 0
+    FROM Match m
+    WHERE m.season.id = :seasonId
+      AND (:currentMatchId IS NULL OR m.id <> :currentMatchId)
+      AND m.homeTeam.id = :homeTeamId
+      AND m.awayTeam.id = :awayTeamId
+""")
+    boolean existsSameHomeAwayPair(
+            @Param("seasonId") Long seasonId,
+            @Param("homeTeamId") Long homeTeamId,
+            @Param("awayTeamId") Long awayTeamId,
+            @Param("currentMatchId") Long currentMatchId
+    );
+
+    @Query("""
+    SELECT COUNT(m)
+    FROM Match m
+    WHERE m.round.id = :roundId
+      AND (:currentMatchId IS NULL OR m.id <> :currentMatchId)
+""")
+    long countByRoundIdExcludingCurrent(
+            @Param("roundId") Integer roundId,
+            @Param("currentMatchId") Long currentMatchId
+    );
+
+    @Query("""
+    SELECT m
+    FROM Match m
+    WHERE m.season.id = :seasonId
+      AND m.matchDate > :currentMatchDate
+      AND m.status = com.example.demo.entity.MatchStatus.SCHEDULED
+      AND (
+            m.homeTeam.id = :seasonTeamId
+         OR m.awayTeam.id = :seasonTeamId
+      )
+    ORDER BY m.matchDate ASC
+""")
+    List<Match> findNextMatchesOfSeasonTeamAfter(
+            @Param("seasonId") Long seasonId,
+            @Param("seasonTeamId") Long seasonTeamId,
+            @Param("currentMatchDate") LocalDateTime currentMatchDate,
+            Pageable pageable
+    );
+
+
+    @Query("""
+    SELECT m
+    FROM Match m
+    WHERE (:status IS NULL OR m.status = :status)
+      AND (:seasonId IS NULL OR m.season.id = :seasonId)
+      AND (:roundId IS NULL OR m.round.id = :roundId)
+      AND (
+            :teamId IS NULL
+         OR m.homeTeam.team.id = :teamId
+         OR m.awayTeam.team.id = :teamId
+      )
+      AND (
+            :search IS NULL
+         OR LOWER(m.homeTeam.team.name) LIKE CONCAT('%', :search, '%')
+         OR LOWER(m.awayTeam.team.name) LIKE CONCAT('%', :search, '%')
+         OR LOWER(m.stadium.name) LIKE CONCAT('%', :search, '%')
+      )
+""")
+    Page<Match> searchMatches(
+            @Param("status") MatchStatus status,
+            @Param("search") String search,
+            @Param("seasonId") Long seasonId,
+            @Param("roundId") Integer roundId,
+            @Param("teamId") Long teamId,
+            Pageable pageable
+    );
+
+    boolean existsBySeasonId(Long seasonId);
+
+    @Query("""
+    SELECT m.manOfTheMatch.id,
+           m.manOfTheMatch.name,
+           COUNT(m)
+    FROM Match m
+    WHERE m.season.id = :seasonId
+      AND m.manOfTheMatch IS NOT NULL
+    GROUP BY m.manOfTheMatch.id, m.manOfTheMatch.name
+    ORDER BY COUNT(m) DESC
+""")
+    List<Object[]> countManOfTheMatchBySeason(@Param("seasonId") Long seasonId);
+
+
+    @Query("""
+    SELECT m
+    FROM Match m
+    WHERE m.season.id = :seasonId
+      AND m.status = com.example.demo.entity.MatchStatus.FINISHED
+      AND (
+            (m.homeTeam.team.id = :teamAId AND m.awayTeam.team.id = :teamBId)
+         OR (m.homeTeam.team.id = :teamBId AND m.awayTeam.team.id = :teamAId)
+      )
+""")
+    List<Match> findHeadToHeadMatches(
+            @Param("seasonId") Long seasonId,
+            @Param("teamAId") Long teamAId,
+            @Param("teamBId") Long teamBId
+    );
 }

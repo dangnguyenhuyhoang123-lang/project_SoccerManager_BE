@@ -113,6 +113,13 @@ public class SystemRuleService {
         rule.setMaxSubstitution(request.getMaxSubstitution());
         rule.setMinRegistrationPlayers(request.getMinRegistrationPlayers());
         rule.setMaxForeignPlayers(request.getMaxForeignPlayers());
+        rule.setMaxForeignPlayersOnField(request.getMaxForeignPlayersOnField());
+        rule.setMaxGoalMinute(request.getMaxGoalMinute());
+        rule.setRankingCriteriaOrder(
+                request.getRankingCriteriaOrder() != null && !request.getRankingCriteriaOrder().isBlank()
+                        ? request.getRankingCriteriaOrder()
+                        : "POINTS,GOAL_DIFFERENCE,GOALS_FOR,HEAD_TO_HEAD,DRAW_LOT"
+        );
     }
 
     private void validateRequest(SystemRuleRequest request) {
@@ -204,6 +211,31 @@ public class SystemRuleService {
             throw new RuntimeException("Trạng thái bộ luật không hợp lệ");
         }
 
+        if (request.getWinPoints() != null
+                && request.getDrawPoints() != null
+                && request.getLosePoints() != null) {
+
+            if (!(request.getWinPoints() > request.getDrawPoints()
+                    && request.getDrawPoints() > request.getLosePoints())) {
+                throw new RuntimeException("Điểm phải thỏa điều kiện: thắng > hòa > thua");
+            }
+        }
+        if (request.getMaxForeignPlayersOnField() != null
+                && request.getMaxForeignPlayersOnField() < 0) {
+            throw new RuntimeException("Số ngoại binh trên sân không được âm");
+        }
+
+        if (request.getMaxForeignPlayersOnField() != null
+                && request.getMaxForeignPlayers() != null
+                && request.getMaxForeignPlayersOnField() > request.getMaxForeignPlayers()) {
+            throw new RuntimeException("Số ngoại binh trên sân không được lớn hơn số ngoại binh đăng ký");
+        }
+
+        if (request.getMaxGoalMinute() != null && request.getMaxGoalMinute() <= 0) {
+            throw new RuntimeException("Thời điểm ghi bàn tối đa phải lớn hơn 0");
+        }
+
+
         validateAllowedGoalTypes(request.getAllowedGoalTypes());
     }
     private void validateAllowedGoalTypes(String allowedGoalTypes) {
@@ -255,7 +287,13 @@ public class SystemRuleService {
                 rule.getStatus(),
                 rule.getMaxSubstitution(),
                 rule.getMinRegistrationPlayers(),
-                rule.getMaxForeignPlayers()
+                rule.getMaxForeignPlayers(),
+                rule.getMaxForeignPlayersOnField(),
+                rule.getMaxGoalMinute(),
+                rule.getRankingCriteriaOrder()
+
+
+
         );
     }
 }

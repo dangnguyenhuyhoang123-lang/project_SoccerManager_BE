@@ -8,6 +8,7 @@ import com.example.demo.dao.user.UserRepository;
 import com.example.demo.dto.RealtimeEventDTO;
 import com.example.demo.entity.*;
 import com.example.demo.entity.registerclub.*;
+import com.example.demo.entity.team.Team;
 import com.example.demo.entity.user.User;
 import com.example.demo.service.NotificationService;
 import com.example.demo.service.RealtimeEventService;
@@ -81,18 +82,20 @@ public class AdminApprovalService {
         SeasonTeam seasonTeam = new SeasonTeam();
         seasonTeam.setTeam(team);
         seasonTeam.setSeason(season);
+        seasonTeam.setRegistrationTeam(reg);
         seasonTeam.setStatus("ACTIVE");
         seasonTeamRepository.save(seasonTeam);
 
         // 2. Đăng ký Cầu thủ vào mùa giải (PlayerSeason)
         for (RegistrationPlayer regPlayer : reg.getPlayers()) {
             PlayerSeason ps = new PlayerSeason();
-            ps.setPlayer(regPlayer.getPlayer()); // Lấy player gốc
+            ps.setPlayer(regPlayer.getPlayer());
             ps.setTeam(team);
             ps.setSeason(season);
             ps.setShirtNumber(regPlayer.getShirtNumber());
             ps.setPrimaryPosition(regPlayer.getPosition());
             ps.setTeamSeason(seasonTeam);
+            ps.setStatus("ACTIVE");
             playerSeasonRepository.save(ps);
         }
 

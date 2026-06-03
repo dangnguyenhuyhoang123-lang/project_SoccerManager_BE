@@ -1,5 +1,6 @@
 package com.example.demo.entity;
 
+import com.example.demo.entity.team.Team;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -26,6 +27,18 @@ public class Stadium {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private GrassType grass;
+
+    @Column
+    private Integer fifaStarRating;
+
+    @Column
+    private String country;
+
+    @Column
+    private String city;
+
+    @Column
+    private String certificateUrl;
 
     @OneToMany(mappedBy = "stadium")
     private List<Team> homeTeams;

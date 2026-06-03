@@ -34,10 +34,10 @@ public class MatchLineupController {
         return matchLineupService.getLineupByTactics(tacticsId);
     }
 
-    @PostMapping("/submit")
-    public TeamLineupResponse submitLineup(@RequestBody MatchLineupSubmitDTO dto) {
-        return matchLineupService.submitLineup(dto);
-    }
+//    @PostMapping("/submit")
+//    public TeamLineupResponse submitLineup(@RequestBody MatchLineupSubmitDTO dto) {
+//        return matchLineupService.submitLineup(dto);
+//    }
 
     @DeleteMapping("/match/{matchId}/team/{teamId}")
     public void deleteLineup(@PathVariable Long matchId, @PathVariable Long teamId) {

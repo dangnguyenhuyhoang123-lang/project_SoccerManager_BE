@@ -10,25 +10,17 @@ import com.example.demo.dao.season.SeasonTeamRepository;
 import com.example.demo.dao.team.TeamRepository;
 import com.example.demo.dao.user.UserRepository;
 import com.example.demo.dto.RealtimeEventDTO;
-import com.example.demo.dto.registrationclub.CoachRegistrationDTO;
-import com.example.demo.dto.registrationclub.FullRegistrationDTO;
-import com.example.demo.dto.registrationclub.PlayerRegistrationDTO;
-import com.example.demo.dto.registrationclub.RegistrationCoachViewDTO;
-import com.example.demo.dto.registrationclub.RegistrationDetailDTO;
-import com.example.demo.dto.registrationclub.RegistrationPlayerViewDTO;
-import com.example.demo.dto.registrationclub.RegistrationSummaryDTO;
+import com.example.demo.dto.registrationclub.*;
 import com.example.demo.entity.*;
-import com.example.demo.entity.registerclub.RegistrationCoach;
-import com.example.demo.entity.registerclub.RegistrationPlayer;
-import com.example.demo.entity.registerclub.RegistrationStadium;
-import com.example.demo.entity.registerclub.RegistrationStatus;
-import com.example.demo.entity.registerclub.RegistrationTeam;
+import com.example.demo.entity.registerclub.*;
+import com.example.demo.entity.team.Team;
 import com.example.demo.entity.user.User;
 import com.example.demo.service.RealtimeEventService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Period;
@@ -55,6 +47,8 @@ public class RegistrationService {
 
     @Transactional
     public RegistrationSummaryDTO submitRegistration(FullRegistrationDTO dto) {
+
+        validateRequestShape(dto);
         // 2. Lấy Season và Team
         Season season = seasonRepository.findById(dto.getSeasonID())
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy mùa giải"));
@@ -64,6 +58,9 @@ public class RegistrationService {
         Team team = teamRepository.findById(dto.getTeamInfo().getId())
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy câu lạc bộ"));
 
+        // 1. Kiểm tra hình dáng DTO
+
+
         if (rule == null) {
             throw new RuntimeException("Mùa giải chưa được cấu hình bộ luật");
         }
@@ -72,12 +69,10 @@ public class RegistrationService {
             throw new RuntimeException("Bộ luật của mùa giải đang tạm ngưng");
         }
 
-        if (!"VIETNAM".equalsIgnoreCase(dto.getTeamInfo().getOrganizationCountry())
-                && !"VIỆT NAM".equalsIgnoreCase(dto.getTeamInfo().getOrganizationCountry())) {
-            throw new RuntimeException("Cơ quan chủ quản phải nằm tại Việt Nam");
-        }
-        // 1. Kiểm tra hình dáng DTO
-        validateRequestShape(dto);
+//        if (!isVietnam(dto.getTeamInfo().getOrganizationCountry())) {
+//            throw new RuntimeException("Cơ quan chủ quản phải nằm tại Việt Nam");
+//        }
+
 
 
 
@@ -102,6 +97,7 @@ public class RegistrationService {
 
 
 
+
         // 3. Khởi tạo Đơn đăng ký tổng thể
         RegistrationTeam registration = new RegistrationTeam();
         registration.setTeam(team);
@@ -112,6 +108,11 @@ public class RegistrationService {
             registration.setNote(dto.getTeamInfo().getNote());
         }
 
+        registration.setHomeKitColor(dto.getTeamInfo().getHomeKitColor());
+        registration.setAwayKitColor(dto.getTeamInfo().getAwayKitColor());
+        registration.setHomeKitImageUrl(dto.getTeamInfo().getHomeKitImageUrl());
+        registration.setAwayKitImageUrl(dto.getTeamInfo().getAwayKitImageUrl());
+
         // 4. Xử lý thông tin Sân vận động
         if (dto.getStadiumInfo() != null) {
             RegistrationStadium stadium = new RegistrationStadium();
@@ -119,6 +120,9 @@ public class RegistrationService {
             stadium.setAddress(dto.getStadiumInfo().getAddress());
             stadium.setCapacity(dto.getStadiumInfo().getCapacity());
             stadium.setGrass(dto.getStadiumInfo().getGrass());
+            stadium.setCountry(dto.getStadiumInfo().getCountry());
+            stadium.setFifaStarRating(dto.getStadiumInfo().getFifaStarRating());
+            stadium.setCertificateUrl(dto.getStadiumInfo().getCertificateUrl());
             registration.setStadium(stadium);
         }
 
@@ -166,10 +170,25 @@ public class RegistrationService {
         }
         registration.setCoaches(regCoaches);
 
+        registration.setFeeStatus(FeeStatus.UNPAID);
+        registration.setFeeAmount(BigDecimal.valueOf(1_000_000_000L));
+
         // 7. Lưu toàn bộ đơn đăng ký vào DB
         RegistrationTeam savedRegistration = registrationTeamRepository.save(registration);
         sendRegistrationSubmittedEventToAdmins(savedRegistration);
         return toSummaryDto(savedRegistration);
+    }
+    private boolean isVietnam(String value) {
+        if (value == null || value.isBlank()) {
+            return false;
+        }
+
+        String normalized = value.trim().toLowerCase();
+
+        return normalized.equals("việt nam")
+                || normalized.equals("viet nam")
+                || normalized.equals("vietnam")
+                || normalized.equals("vn");
     }
 
     private void sendRegistrationSubmittedEventToAdmins(RegistrationTeam savedRegistration) {
@@ -249,6 +268,23 @@ public class RegistrationService {
         return toDetailDto(registration, registrationPlayers, registrationCoaches);
     }
 
+    @Transactional
+    public RegistrationSummaryDTO markRegistrationPaid(Long id, String paymentProofUrl) {
+        RegistrationTeam registration = registrationTeamRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn đăng ký id = " + id));
+
+        if (registration.getStatus() != RegistrationStatus.PENDING) {
+            throw new RuntimeException("Chỉ có thể cập nhật lệ phí cho đơn đang chờ duyệt");
+        }
+
+        registration.setFeeStatus(FeeStatus.PAID);
+        registration.setPaymentProofUrl(paymentProofUrl);
+        registration.setPaidAt(LocalDateTime.now());
+
+        RegistrationTeam saved = registrationTeamRepository.save(registration);
+        return toSummaryDto(saved);
+    }
+
 
 
     private void validateRequestShape(FullRegistrationDTO dto) {
@@ -267,6 +303,28 @@ public class RegistrationService {
         // Nếu có đăng ký sân nhà riêng, kiểm tra tên sân
         if (dto.getStadiumInfo() != null && (dto.getStadiumInfo().getName() == null || dto.getStadiumInfo().getName().trim().isEmpty())) {
             throw new IllegalArgumentException("Tên sân vận động đăng ký không được để trống");
+        }
+        validateStadiumInfo(dto.getStadiumInfo());
+    }
+
+//    Kiểm tra sân vận động
+
+
+    private void validateStadiumInfo(StadiumRegistrationDTO stadium) {
+        if (stadium == null) {
+            throw new RuntimeException("Thông tin sân nhà không được để trống");
+        }
+
+        if (stadium.getCapacity() == null || stadium.getCapacity() < 10000) {
+            throw new RuntimeException("Sân nhà phải có sức chứa tối thiểu 10.000 chỗ");
+        }
+
+        if (stadium.getFifaStarRating() == null || stadium.getFifaStarRating() < 2) {
+            throw new RuntimeException("Sân nhà phải đạt tiêu chuẩn ít nhất 2 sao");
+        }
+
+        if (!isVietnam(stadium.getCountry())) {
+            throw new RuntimeException("Sân nhà phải nằm tại Việt Nam");
         }
     }
 
@@ -490,7 +548,11 @@ public class RegistrationService {
                 Math.toIntExact(registrationPlayerRepository.countByRegistrationTeamId(reg.getId())),
                 Math.toIntExact(registrationCoachRepository.countByRegistrationTeamId(reg.getId())),
                 reg.getCreatedAt(),
-                reg.getNote()
+                reg.getNote(),
+                reg.getFeeAmount(),
+                reg.getFeeStatus(),
+                reg.getPaymentProofUrl(),
+                reg.getPaidAt()
         );
     }
 
@@ -506,6 +568,7 @@ public class RegistrationService {
                 reg.getId(),
                 reg.getSeason() != null ? reg.getSeason().getId() : null,
                 reg.getSeason() != null ? reg.getSeason().getName() : null,
+
                 team != null ? team.getName() : null,
                 team != null ? team.getLogo() : null,
                 team != null ? team.getEstablishedYear() : null,
@@ -514,46 +577,70 @@ public class RegistrationService {
                 team != null ? team.getOwner() : null,
                 team != null ? team.getDescription() : null,
 
-                // Nếu không đăng ký sân riêng, lấy sân mặc định của CLB
-                stadium != null ? stadium.getName() : (team != null && team.getStadium() != null ? team.getStadium().getName() : null),
-                stadium != null ? stadium.getAddress() : (team != null && team.getStadium() != null ? team.getStadium().getAddress() : null),
-                stadium != null ? stadium.getCapacity() : (team != null && team.getStadium() != null ? team.getStadium().getCapacity() : null),
-                stadium != null ? stadium.getGrass() : (team != null && team.getStadium() != null ? team.getStadium().getGrass() : null),
+                stadium != null
+                        ? stadium.getName()
+                        : (team != null && team.getStadium() != null ? team.getStadium().getName() : null),
+
+                stadium != null
+                        ? stadium.getAddress()
+                        : (team != null && team.getStadium() != null ? team.getStadium().getAddress() : null),
+
+                stadium != null
+                        ? stadium.getCapacity()
+                        : (team != null && team.getStadium() != null ? team.getStadium().getCapacity() : null),
+
+                stadium != null
+                        ? stadium.getGrass()
+                        : (team != null && team.getStadium() != null ? team.getStadium().getGrass() : null),
+
+                stadium != null ? stadium.getCountry() : null,
+                stadium != null ? stadium.getFifaStarRating() : null,
+                stadium != null ? stadium.getCertificateUrl() : null,
 
                 reg.getStatus(),
                 reg.getNote(),
                 reg.getCreatedAt(),
 
-                // Map thông tin cầu thủ từ Object Player gốc
                 registrationPlayers == null ? List.of() : registrationPlayers.stream()
                         .map(rp -> {
                             Player p = rp.getPlayer();
+
                             return new RegistrationPlayerViewDTO(
-                                    p.getName(),
-                                    p.getIDCode(),
-                                    p.getDateOfBirth(),
-                                    rp.getPosition(), // Vị trí đăng ký trong giải
-                                    rp.getShirtNumber(), // Số áo trong giải
-                                    p.getNationality(),
-                                    p.getHeight(),
-                                    p.getWeight(),
-                                    false // is_official có thể set mặc định
+                                    p != null ? p.getName() : null,
+                                    p != null ? p.getIDCode() : null,
+                                    p != null ? p.getDateOfBirth() : null,
+                                    rp.getPosition(),
+                                    rp.getShirtNumber(),
+                                    p != null ? p.getNationality() : null,
+                                    p != null ? p.getHeight() : null,
+                                    p != null ? p.getWeight() : null,
+                                    false
                             );
                         }).toList(),
 
-                // Map thông tin HLV từ Object Coach gốc
                 registrationCoaches == null ? List.of() : registrationCoaches.stream()
                         .map(rc -> {
                             Coach c = rc.getCoach();
+
                             return new RegistrationCoachViewDTO(
-                                    c.getName(),
-                                    c.getNationality(),
-                                    c.getIDCode(),
-                                    c.getBirthDay(),
-                                    rc.getTournamentRole(), // Vai trò trong giải
-                                    c.getDes()
+                                    c != null ? c.getName() : null,
+                                    c != null ? c.getNationality() : null,
+                                    c != null ? c.getIDCode() : null,
+                                    c != null ? c.getBirthDay() : null,
+                                    rc.getTournamentRole(),
+                                    c != null ? c.getDes() : null
                             );
-                        }).toList()
+                        }).toList(),
+
+                reg.getHomeKitColor(),
+                reg.getAwayKitColor(),
+                reg.getHomeKitImageUrl(),
+                reg.getAwayKitImageUrl(),
+
+                reg.getFeeAmount(),
+                reg.getFeeStatus(),
+                reg.getPaymentProofUrl(),
+                reg.getPaidAt()
         );
     }
 

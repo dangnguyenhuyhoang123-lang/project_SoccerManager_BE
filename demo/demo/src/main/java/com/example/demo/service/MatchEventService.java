@@ -10,6 +10,7 @@ import com.example.demo.dto.RealtimeEventDTO;
 import com.example.demo.dto.matchevent.MatchEventResponse;
 import com.example.demo.dto.matchevent.MatchEventUpsertRequest;
 import com.example.demo.entity.*;
+import com.example.demo.entity.team.Team;
 import com.example.demo.entity.user.User;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +35,7 @@ public class MatchEventService {
     private final UserRepository userRepository;
     private final RealtimeEventService realtimeEventService;
     private final StandingService standingService;
+    private final PlayerSuspensionService playerSuspensionService;
 
 
     private SystemRule getRequiredRule(Season season) {
@@ -64,6 +66,10 @@ public class MatchEventService {
 
     @Transactional
     public MatchEventResponse createEvent(Long matchId, MatchEventUpsertRequest request) {
+        if (request == null) {
+            throw new RuntimeException("Dữ liệu sự kiện không được để trống");
+        }
+
         Match match = matchRepository.findById(matchId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy trận đấu id = " + matchId));
 
@@ -71,15 +77,19 @@ public class MatchEventService {
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đội bóng id = " + request.getTeamId()));
 
         SystemRule rule = getRequiredRule(match.getSeason());
+
+        validateEventRequest(request, rule);
+        validateTeamBelongsToMatch(match, team);
+
         if (request.getEventType() == EventType.GOAL) {
             validateGoalTypeAllowed(rule, request.getGoalType());
         }
+
         if (request.getEventType() == EventType.SUBSTITUTION) {
             validateSubstitutionLimit(matchId, request.getTeamId(), rule, null);
         }
 
-        validateTeamBelongsToMatch(match, team);
-        validateEventRequest(request);
+        validatePlayersBelongToTeamInSeason(request, team, match.getSeason());
 
         MatchEvent event = new MatchEvent();
         event.setMatch(match);
@@ -88,13 +98,21 @@ public class MatchEventService {
 
         MatchEvent savedEvent = matchEventRepository.save(event);
 
-
-
         playerStatsService.applyEvent(savedEvent, 1);
         recalculateMatchScore(matchId);
         sendMatchEventRealtimeEvents(matchId);
 
         return toResponse(savedEvent);
+    }
+
+    private void validatePlayersBelongToTeamInSeason(
+            MatchEventUpsertRequest request,
+            Team team,
+            Season season
+    ) {
+        validatePlayerBelongsToTeamInSeason(findPlayerOrNull(request.getPlayerId()), team, season);
+        validatePlayerBelongsToTeamInSeason(findPlayerOrNull(request.getPlayerInId()), team, season);
+        validatePlayerBelongsToTeamInSeason(findPlayerOrNull(request.getAssistPlayerId()), team, season);
     }
 
     private void validateGoalTypeAllowed(SystemRule rule, GoalType goalType) {
@@ -162,6 +180,10 @@ public class MatchEventService {
 
     @Transactional
     public MatchEventResponse updateEvent(Long matchId, Long eventId, MatchEventUpsertRequest request) {
+        if (request == null) {
+            throw new RuntimeException("Dữ liệu sự kiện không được để trống");
+        }
+
         MatchEvent event = matchEventRepository.findById(eventId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy sự kiện id = " + eventId));
 
@@ -169,24 +191,40 @@ public class MatchEventService {
             throw new RuntimeException("Sự kiện id = " + eventId + " không thuộc trận đấu id = " + matchId);
         }
 
-        // 1. Trừ thống kê từ event cũ
-        playerStatsService.applyEvent(event, -1);
+        Match match = matchRepository.findById(matchId)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy trận đấu id = " + matchId));
 
         Team team = teamRepository.findById(request.getTeamId())
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đội bóng id = " + request.getTeamId()));
 
-        validateTeamBelongsToMatch(event.getMatch(), team);
-        validateEventRequest(request);
+        SystemRule rule = getRequiredRule(match.getSeason());
+
+        validateEventRequest(request, rule);
+        validateTeamBelongsToMatch(match, team);
+
+        if (request.getEventType() == EventType.GOAL) {
+            validateGoalTypeAllowed(rule, request.getGoalType());
+        }
+
+        if (request.getEventType() == EventType.SUBSTITUTION) {
+            validateSubstitutionLimit(matchId, request.getTeamId(), rule, eventId);
+        }
+
+        validatePlayersBelongToTeamInSeason(request, team, match.getSeason());
+
+        // Trừ thống kê từ event cũ
+        playerStatsService.applyEvent(event, -1);
 
         applyRequest(event, request, team);
 
         MatchEvent savedEvent = matchEventRepository.save(event);
 
-        // 2. Cộng thống kê từ event mới
+        // Cộng thống kê từ event mới
         playerStatsService.applyEvent(savedEvent, 1);
 
         recalculateMatchScore(matchId);
         sendMatchEventRealtimeEvents(matchId);
+
         return toResponse(savedEvent);
     }
 
@@ -251,13 +289,9 @@ public class MatchEventService {
         }
     }
 
-    private void validateEventRequest(MatchEventUpsertRequest request) {
-        if (request.getMinute() == null || request.getMinute() < 0 || request.getMinute() > 130) {
-            throw new RuntimeException("Phút thi đấu không hợp lệ");
-        }
-
-        if (request.getExtraMinute() != null && request.getExtraMinute() < 0) {
-            throw new RuntimeException("Phút bù giờ không hợp lệ");
+    private void validateEventRequest(MatchEventUpsertRequest request, SystemRule rule) {
+        if (request == null) {
+            throw new RuntimeException("Dữ liệu sự kiện không được để trống");
         }
 
         if (request.getEventType() == null) {
@@ -268,7 +302,23 @@ public class MatchEventService {
             throw new RuntimeException("Đội bóng không được để trống");
         }
 
+        if (request.getMinute() == null || request.getMinute() < 0) {
+            throw new RuntimeException("Thời điểm sự kiện không hợp lệ");
+        }
+
+        if (request.getExtraMinute() != null && request.getExtraMinute() < 0) {
+            throw new RuntimeException("Phút bù giờ không hợp lệ");
+        }
+
         if (request.getEventType() == EventType.GOAL) {
+            int maxGoalMinute = rule.getMaxGoalMinute() != null
+                    ? rule.getMaxGoalMinute()
+                    : 90;
+
+            if (request.getMinute() > maxGoalMinute) {
+                throw new RuntimeException("Thời điểm ghi bàn không được vượt quá " + maxGoalMinute + " phút");
+            }
+
             if (request.getPlayerId() == null) {
                 throw new RuntimeException("Sự kiện bàn thắng cần có cầu thủ ghi bàn");
             }
@@ -280,7 +330,8 @@ public class MatchEventService {
             request.setGoalType(null);
         }
 
-        if (request.getEventType() == EventType.YELLOW_CARD || request.getEventType() == EventType.RED_CARD) {
+        if (request.getEventType() == EventType.YELLOW_CARD
+                || request.getEventType() == EventType.RED_CARD) {
             if (request.getPlayerId() == null) {
                 throw new RuntimeException("Sự kiện thẻ cần có cầu thủ nhận thẻ");
             }
@@ -289,6 +340,10 @@ public class MatchEventService {
         if (request.getEventType() == EventType.SUBSTITUTION) {
             if (request.getPlayerId() == null || request.getPlayerInId() == null) {
                 throw new RuntimeException("Sự kiện thay người cần có cầu thủ rời sân và cầu thủ vào sân");
+            }
+
+            if (request.getPlayerId().equals(request.getPlayerInId())) {
+                throw new RuntimeException("Cầu thủ rời sân và vào sân không được trùng nhau");
             }
         }
     }
@@ -386,6 +441,7 @@ public class MatchEventService {
 
         if (match.getStatus() == MatchStatus.FINISHED && match.getSeason() != null) {
             Long seasonId = match.getSeason().getId();
+            playerSuspensionService.generateSuspensionsAfterMatch(match.getId());
             standingService.recalculateBySeason(seasonId);
             realtimeEventService.sendToUsers(
                     userIds,

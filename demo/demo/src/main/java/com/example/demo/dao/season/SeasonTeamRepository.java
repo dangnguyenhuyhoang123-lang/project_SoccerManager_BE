@@ -2,7 +2,7 @@ package com.example.demo.dao.season;
 
 import com.example.demo.entity.Season;
 import com.example.demo.entity.SeasonTeam;
-import com.example.demo.entity.Team;
+import com.example.demo.entity.team.Team;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -31,4 +31,5 @@ public interface SeasonTeamRepository extends JpaRepository<SeasonTeam, Long> {
     Optional<SeasonTeam> findBySeasonAndTeam(Season season, Team team);
 
     Long countBySeasonId(Long seasonId);
+    List<SeasonTeam> findBySeasonIdAndStatus(Long seasonId, String status);
 }

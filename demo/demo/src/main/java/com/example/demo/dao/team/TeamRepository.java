@@ -1,7 +1,6 @@
 package com.example.demo.dao.team;
 
-import com.example.demo.entity.Team;
-import com.example.demo.entity.user.User;
+import com.example.demo.entity.team.Team;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;

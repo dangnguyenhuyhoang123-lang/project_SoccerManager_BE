@@ -10,7 +10,7 @@ import com.example.demo.entity.Player;
 import com.example.demo.entity.PlayerSeason;
 import com.example.demo.entity.Season;
 import com.example.demo.entity.SeasonTeam;
-import com.example.demo.entity.Team;
+import com.example.demo.entity.team.Team;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;

@@ -1,6 +1,7 @@
 package com.example.demo.entity.registerclub;
 
 import com.example.demo.entity.*;
+import com.example.demo.entity.team.Team;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -42,7 +43,9 @@ public class RegistrationTeam extends BaseEntity {
     private String rejectionReason;
 
     // Các thông tin "chụp ảnh" lúc đăng ký (có thể thay đổi so với mặc định)
+    @Column
     private String nameAtRegistration; // Tên đội lúc đăng ký giải này
+    @Column
     private String logoAtRegistration;
 
     @OneToMany(mappedBy = "registrationTeam", cascade = CascadeType.ALL, orphanRemoval = true)
@@ -70,4 +73,17 @@ public class RegistrationTeam extends BaseEntity {
 
     @Column(name = "paid_at")
     private LocalDateTime paidAt;
+
+
+    @Column
+    private String homeKitColor;
+
+    @Column
+    private String awayKitColor;
+
+    @Column
+    private String homeKitImageUrl;
+
+    @Column
+    private String awayKitImageUrl;
 }

@@ -10,7 +10,7 @@ import com.example.demo.dto.matchstats.MatchStatsUpsertRequest;
 import com.example.demo.entity.Match;
 import com.example.demo.entity.MatchStats;
 import com.example.demo.entity.SeasonTeam;
-import com.example.demo.entity.Team;
+import com.example.demo.entity.team.Team;
 import com.example.demo.entity.user.User;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;

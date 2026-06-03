@@ -4,6 +4,8 @@ import com.example.demo.entity.Player;
 import com.example.demo.entity.PlayerStats;
 import com.example.demo.entity.Season;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.data.rest.core.annotation.RepositoryRestResource;
 import org.springframework.stereotype.Repository;
 
@@ -27,6 +29,15 @@ public interface PlayerStatsRepository extends JpaRepository<PlayerStats,Long> {
     List<PlayerStats> findBySeasonId(Long seasonId);
 
     boolean existsByPlayerIdAndSeasonId(Long playerId, Long seasonId);
+
+    @Query("""
+    SELECT ps
+    FROM PlayerStats ps
+    WHERE ps.season.id = :seasonId
+      AND ps.goals > 0
+    ORDER BY ps.goals DESC, ps.assists DESC, ps.player.name ASC
+""")
+    List<PlayerStats> findTopScorersBySeasonId(@Param("seasonId") Long seasonId);
 
 
 }
