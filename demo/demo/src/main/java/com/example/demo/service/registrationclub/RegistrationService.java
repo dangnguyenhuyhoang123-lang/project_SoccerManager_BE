@@ -82,7 +82,7 @@ public class RegistrationService {
         validateBusinessRules(team, season,rule);
 
         // 4. KIỂM TRA HLV VÀ CẦU THỦ
-        validateCoachList(dto.getListCoachInfo());
+        validateCoachList(dto.getListCoachInfo(), rule);
 
         // Tạo list Entity để hứng dữ liệu từ DB
         List<Player> dbPlayersForValidation = new ArrayList<>();
@@ -453,14 +453,6 @@ public class RegistrationService {
 
         int squadSize = dbPlayers.size();
 
-        if (rule.getMinRegistrationPlayers() != null
-                && squadSize < rule.getMinRegistrationPlayers()) {
-            throw new IllegalArgumentException(
-                    "Số lượng cầu thủ đăng ký (" + squadSize + ") chưa đạt tối thiểu theo luật ("
-                            + rule.getMinRegistrationPlayers() + ")"
-            );
-        }
-
         if (rule.getMinPlayers() != null && squadSize < rule.getMinPlayers()) {
             throw new IllegalArgumentException(
                     "Số lượng cầu thủ (" + squadSize + ") chưa đạt tối thiểu (" + rule.getMinPlayers() + ")"
@@ -520,8 +512,30 @@ public class RegistrationService {
                 && !normalized.equals("vn");
     }
 
-    private void validateCoachList(List<CoachRegistrationDTO> coaches) {
+    private void validateCoachList(List<CoachRegistrationDTO> coaches, SystemRule rule) {
         Set<Long> coachIds = new HashSet<>();
+
+        int coachCount = coaches == null ? 0 : coaches.size();
+        Integer minCoaches = rule != null && rule.getMinCoaches() != null ? rule.getMinCoaches() : 3;
+        Integer maxCoaches = rule != null ? rule.getMaxCoaches() : null;
+
+        if (coachCount < minCoaches) {
+            throw new IllegalArgumentException(
+                    "Số lượng ban huấn luyện (" + coachCount + ") chưa đạt tối thiểu theo luật (" + minCoaches + ")"
+            );
+        }
+
+        if (maxCoaches != null && coachCount > maxCoaches) {
+            throw new IllegalArgumentException(
+                    "Số lượng ban huấn luyện (" + coachCount + ") vượt quá tối đa theo luật (" + maxCoaches + ")"
+            );
+        }
+
+        long headCoachCount = 0;
+
+        if (coaches == null) {
+            return;
+        }
 
         for (CoachRegistrationDTO coach : coaches) {
             if (coach.getCoachId() == null) {
@@ -530,6 +544,15 @@ public class RegistrationService {
             if (!coachIds.add(coach.getCoachId())) {
                 throw new IllegalArgumentException("Huấn luyện viên ID " + coach.getCoachId() + " bị chọn nhiều lần trong đơn");
             }
+
+            String role = coach.getRole() == null ? "" : coach.getRole().trim().toLowerCase();
+            if (role.contains("hlv trưởng") || role.contains("huấn luyện viên trưởng") || role.contains("head_coach")) {
+                headCoachCount++;
+            }
+        }
+
+        if (headCoachCount != 1) {
+            throw new IllegalArgumentException("Ban huấn luyện phải có đúng 01 Huấn luyện viên trưởng");
         }
     }
 

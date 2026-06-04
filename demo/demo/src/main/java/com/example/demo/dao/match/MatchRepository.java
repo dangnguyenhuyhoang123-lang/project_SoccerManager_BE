@@ -189,24 +189,49 @@ public interface MatchRepository extends JpaRepository<Match,Long> {
     );
 
 
-    @Query("""
-    SELECT m
-    FROM Match m
-    WHERE (:status IS NULL OR m.status = :status)
-      AND (:seasonId IS NULL OR m.season.id = :seasonId)
-      AND (:roundId IS NULL OR m.round.id = :roundId)
-      AND (
-            :teamId IS NULL
-         OR m.homeTeam.team.id = :teamId
-         OR m.awayTeam.team.id = :teamId
-      )
-      AND (
-            :search IS NULL
-         OR LOWER(m.homeTeam.team.name) LIKE CONCAT('%', :search, '%')
-         OR LOWER(m.awayTeam.team.name) LIKE CONCAT('%', :search, '%')
-         OR LOWER(m.stadium.name) LIKE CONCAT('%', :search, '%')
-      )
-""")
+    @Query(
+            value = """
+SELECT m
+FROM Match m
+WHERE (:status IS NULL OR m.status = :status)
+  AND (:seasonId IS NULL OR m.season.id = :seasonId)
+  AND (:roundId IS NULL OR m.round.id = :roundId)
+  AND (
+        :teamId IS NULL
+     OR m.homeTeam.team.id = :teamId
+     OR m.awayTeam.team.id = :teamId
+  )
+  AND (
+        :search IS NULL
+     OR LOWER(m.homeTeam.team.name) LIKE CONCAT('%', :search, '%')
+     OR LOWER(m.awayTeam.team.name) LIKE CONCAT('%', :search, '%')
+     OR LOWER(m.stadium.name) LIKE CONCAT('%', :search, '%')
+  )
+ORDER BY
+  CASE WHEN m.matchDate >= CURRENT_TIMESTAMP THEN 0 ELSE 1 END ASC,
+  CASE WHEN m.matchDate >= CURRENT_TIMESTAMP THEN m.matchDate END ASC,
+  CASE WHEN m.matchDate < CURRENT_TIMESTAMP THEN m.matchDate END DESC,
+  m.id DESC
+""",
+            countQuery = """
+SELECT COUNT(m)
+FROM Match m
+WHERE (:status IS NULL OR m.status = :status)
+  AND (:seasonId IS NULL OR m.season.id = :seasonId)
+  AND (:roundId IS NULL OR m.round.id = :roundId)
+  AND (
+        :teamId IS NULL
+     OR m.homeTeam.team.id = :teamId
+     OR m.awayTeam.team.id = :teamId
+  )
+  AND (
+        :search IS NULL
+     OR LOWER(m.homeTeam.team.name) LIKE CONCAT('%', :search, '%')
+     OR LOWER(m.awayTeam.team.name) LIKE CONCAT('%', :search, '%')
+     OR LOWER(m.stadium.name) LIKE CONCAT('%', :search, '%')
+  )
+"""
+    )
     Page<Match> searchMatches(
             @Param("status") MatchStatus status,
             @Param("search") String search,

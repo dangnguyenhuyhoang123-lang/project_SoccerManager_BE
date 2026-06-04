@@ -77,7 +77,7 @@ public class AdminApprovalService {
         }
         validateRegistrationPlayersByRule(reg, rule, season);
         validateNoDuplicateShirtNumbers(reg);
-        validateCoaches(reg);
+        validateCoaches(reg, rule);
         // 1. Đăng ký Đội vào mùa giải
         SeasonTeam seasonTeam = new SeasonTeam();
         seasonTeam.setTeam(team);
@@ -148,12 +148,25 @@ public class AdminApprovalService {
         }
     }
 
-    private void validateCoaches(RegistrationTeam reg) {
+    private void validateCoaches(RegistrationTeam reg, SystemRule rule) {
         if (reg.getCoaches() == null || reg.getCoaches().isEmpty()) {
             throw new RuntimeException("Đơn đăng ký chưa có ban huấn luyện");
         }
 
+        int coachCount = reg.getCoaches().size();
+        Integer minCoaches = rule != null && rule.getMinCoaches() != null ? rule.getMinCoaches() : 3;
+        Integer maxCoaches = rule != null ? rule.getMaxCoaches() : null;
+
+        if (coachCount < minCoaches) {
+            throw new RuntimeException("Số lượng ban huấn luyện chưa đạt tối thiểu: " + minCoaches);
+        }
+
+        if (maxCoaches != null && coachCount > maxCoaches) {
+            throw new RuntimeException("Số lượng ban huấn luyện vượt quá tối đa: " + maxCoaches);
+        }
+
         Set<Long> coachIds = new HashSet<>();
+        long headCoachCount = 0;
 
         for (RegistrationCoach rc : reg.getCoaches()) {
             if (rc.getCoach() == null || rc.getCoach().getId() == null) {
@@ -167,6 +180,15 @@ public class AdminApprovalService {
             if (rc.getTournamentRole() == null || rc.getTournamentRole().isBlank()) {
                 throw new RuntimeException("Vai trò HLV trong giải không được để trống");
             }
+
+            String role = rc.getTournamentRole().trim().toLowerCase();
+            if (role.contains("hlv trưởng") || role.contains("huấn luyện viên trưởng") || role.contains("head_coach")) {
+                headCoachCount++;
+            }
+        }
+
+        if (headCoachCount != 1) {
+            throw new RuntimeException("Ban huấn luyện phải có đúng 01 Huấn luyện viên trưởng");
         }
     }
     private void validateRegistrationPlayersByRule(
@@ -182,10 +204,9 @@ public class AdminApprovalService {
 
         int squadSize = players.size();
 
-        if (rule.getMinRegistrationPlayers() != null
-                && squadSize < rule.getMinRegistrationPlayers()) {
+        if (rule.getMinPlayers() != null && squadSize < rule.getMinPlayers()) {
             throw new RuntimeException(
-                    "Số cầu thủ đăng ký chưa đạt tối thiểu: " + rule.getMinRegistrationPlayers()
+                    "Số cầu thủ đăng ký chưa đạt tối thiểu: " + rule.getMinPlayers()
             );
         }
 

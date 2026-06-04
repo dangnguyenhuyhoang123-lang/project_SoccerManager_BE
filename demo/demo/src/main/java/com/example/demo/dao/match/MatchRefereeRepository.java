@@ -5,7 +5,6 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -16,6 +15,8 @@ public interface MatchRefereeRepository extends JpaRepository<MatchReferee, Long
     List<MatchReferee> findByMatchId(Long matchId);
 
     boolean existsByMatchIdAndRefereeId(Long matchId, Long refereeId);
+
+    boolean existsByRefereeId(Long refereeId);
 
     boolean existsByMatchIdAndRoleIgnoreCase(Long matchId, String role);
 

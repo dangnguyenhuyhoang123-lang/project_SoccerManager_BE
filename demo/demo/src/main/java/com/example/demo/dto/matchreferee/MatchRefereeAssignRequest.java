@@ -7,4 +7,6 @@ public class MatchRefereeAssignRequest {
     private Long matchId;
     private Long refereeId;
     private String role;
+    private String note;
 }
+

@@ -1,21 +1,24 @@
 package com.example.demo.service.crawl;
 
+import com.example.demo.dao.SystemRuleRepository;
 import com.example.demo.dao.match.MatchRepository;
 import com.example.demo.dto.crawl.VLeagueMatchResponse;
 import com.example.demo.entity.Match;
 import com.example.demo.entity.SeasonTeam;
+import com.example.demo.entity.SystemRule;
+import lombok.AllArgsConstructor;
+import lombok.NoArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
 @Service
+@AllArgsConstructor
 public class VLeagueQueryService {
 
     private final MatchRepository matchRepository;
 
-    public VLeagueQueryService(MatchRepository matchRepository) {
-        this.matchRepository = matchRepository;
-    }
+
 
     public List<VLeagueMatchResponse> getMatches(String seasonYear) {
         return matchRepository.findVLeagueMatchesBySeasonYear(seasonYear)
@@ -67,6 +70,8 @@ public class VLeagueQueryService {
 
         return dto;
     }
+
+
 
     private String formatRoundName(Integer roundNumber) {
         if (roundNumber == null) {

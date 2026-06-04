@@ -314,8 +314,9 @@ public class MatchEventService {
             int maxGoalMinute = rule.getMaxGoalMinute() != null
                     ? rule.getMaxGoalMinute()
                     : 90;
+            int extraTime = request.getExtraMinute().equals(0) ? 0 : request.getExtraMinute();
 
-            if (request.getMinute() > maxGoalMinute) {
+            if (request.getMinute() > (maxGoalMinute + extraTime)) {
                 throw new RuntimeException("Thời điểm ghi bàn không được vượt quá " + maxGoalMinute + " phút");
             }
 

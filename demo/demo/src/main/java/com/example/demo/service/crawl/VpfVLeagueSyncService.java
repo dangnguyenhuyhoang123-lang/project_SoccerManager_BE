@@ -15,6 +15,7 @@ import com.example.demo.entity.*;
 import com.example.demo.entity.team.Team;
 import com.example.demo.service.StandingService;
 import com.example.demo.service.TeamStatsService;
+import lombok.AllArgsConstructor;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -29,6 +30,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 
 @Service
+@AllArgsConstructor
 public class VpfVLeagueSyncService {
 
     private static final String SOURCE_NAME = "VPF";
@@ -57,24 +59,9 @@ public class VpfVLeagueSyncService {
     private final PlayerStatsRepository playerStatsRepository;
     private final CoachRepository coachRepository;
     private final SeasonTeamCoachRepository seasonTeamCoachRepository;
+    private final SystemRuleRepository systemRuleRepository;
 
 
-    public VpfVLeagueSyncService(LeagueRepository leagueRepository, SeasonRepository seasonRepository, RoundRepository roundRepository, TeamRepository teamRepository, SeasonTeamRepository seasonTeamRepository, StadiumRepository stadiumRepository, MatchRepository matchRepository, StandingService standingService, TeamStatsService teamStatsService, PlayerRepository playerRepository, PlayerSeasonRepository playerSeasonRepository, PlayerStatsRepository playerStatsRepository, CoachRepository coachRepository, SeasonTeamCoachRepository seasonTeamCoachRepository) {
-        this.leagueRepository = leagueRepository;
-        this.seasonRepository = seasonRepository;
-        this.roundRepository = roundRepository;
-        this.teamRepository = teamRepository;
-        this.seasonTeamRepository = seasonTeamRepository;
-        this.stadiumRepository = stadiumRepository;
-        this.matchRepository = matchRepository;
-        this.standingService = standingService;
-        this.teamStatsService = teamStatsService;
-        this.playerRepository = playerRepository;
-        this.playerSeasonRepository = playerSeasonRepository;
-        this.playerStatsRepository = playerStatsRepository;
-        this.coachRepository = coachRepository;
-        this.seasonTeamCoachRepository = seasonTeamCoachRepository;
-    }
 
     //    private Document loadVpfCalendarDocument() {
 //        try {
@@ -459,18 +446,76 @@ public class VpfVLeagueSyncService {
 //                });
 //    }
 
-    private Season findOrCreateSeason(League league, VpfSeasonSyncRequest request) {
-        return seasonRepository.findByYearAndLeague(request.getSeasonYear(), league)
+//    private Season findOrCreateSeason(League league, VpfSeasonSyncRequest request) {
+//        return seasonRepository.findByYearAndLeague(request.getSeasonYear(), league)
+//                .orElseGet(() -> {
+//                    Season season = new Season();
+//                    season.setYear(request.getSeasonYear());
+//                    season.setName(request.getSeasonName());
+//                    season.setLeague(league);
+//                    season.setStartDate(request.getStartDate());
+//                    season.setEndDate(request.getEndDate());
+//                    season.setVpfSeasonUrl(request.getCalendarUrl());
+//                    season.setSourceName(SOURCE_NAME);
+//                    return seasonRepository.save(season);
+//                });
+//    }
+private Season findOrCreateSeason(League league, VpfSeasonSyncRequest request) {
+    Season season = seasonRepository.findByYearAndLeague(request.getSeasonYear(), league)
+            .orElseGet(() -> {
+                Season newSeason = new Season();
+                newSeason.setYear(request.getSeasonYear());
+                newSeason.setName(request.getSeasonName());
+                newSeason.setLeague(league);
+                newSeason.setStartDate(request.getStartDate());
+                newSeason.setEndDate(request.getEndDate());
+                newSeason.setVpfSeasonUrl(request.getCalendarUrl());
+                newSeason.setSourceName(SOURCE_NAME);
+                return newSeason;
+            });
+
+    if (season.getSystemRule() == null) {
+        season.setSystemRule(getOrCreateDefaultVpfRule());
+    }
+
+
+
+    return seasonRepository.save(season);
+}
+
+    private SystemRule getOrCreateDefaultVpfRule() {
+        return systemRuleRepository.findAll()
+                .stream()
+                .filter(rule -> "Luật mặc định VPF".equalsIgnoreCase(rule.getRuleName()))
+                .findFirst()
                 .orElseGet(() -> {
-                    Season season = new Season();
-                    season.setYear(request.getSeasonYear());
-                    season.setName(request.getSeasonName());
-                    season.setLeague(league);
-                    season.setStartDate(request.getStartDate());
-                    season.setEndDate(request.getEndDate());
-                    season.setVpfSeasonUrl(request.getCalendarUrl());
-                    season.setSourceName(SOURCE_NAME);
-                    return seasonRepository.save(season);
+                    SystemRule rule = new SystemRule();
+                    rule.setRuleName("Luật mặc định VPF");
+                    rule.setDescription("Luật mặc định dùng cho dữ liệu crawl từ VPF");
+
+                    rule.setMaxTeams(20);
+                    rule.setMinAge(16);
+                    rule.setMaxAge(45);
+                    rule.setMinPlayers(15);
+                    rule.setMaxPlayers(40);
+
+                    rule.setWinPoints(3);
+                    rule.setDrawPoints(1);
+                    rule.setLosePoints(0);
+
+                    rule.setAllowedGoalTypes("NORMAL,OWN_GOAL,PENALTY");
+                    rule.setStatus("ACTIVE");
+                    rule.setMaxSubstitution(5);
+
+                    rule.setMinCoaches(1);
+                    rule.setMaxCoaches(10);
+                    rule.setMaxForeignPlayers(5);
+                    rule.setMaxForeignPlayersOnField(5);
+                    rule.setMaxGoalMinute(130);
+
+                    rule.setRankingCriteriaOrder("POINTS,GOAL_DIFFERENCE,HEAD_TO_HEAD,DRAW_LOT");
+
+                    return systemRuleRepository.save(rule);
                 });
     }
 
@@ -1207,12 +1252,14 @@ public class VpfVLeagueSyncService {
 private void syncInitialPlayerStats(Season season, Player player, VpfPlayerCrawlDto dto) {
     Optional<PlayerStats> existingStats = playerStatsRepository.findByPlayerAndSeason(player, season);
 
-    PlayerStats stats = existingStats.orElseGet(() -> {
-        PlayerStats newStats = new PlayerStats();
-        newStats.setPlayer(player);
-        newStats.setSeason(season);
-        return newStats;
-    });
+    PlayerStats stats = playerStatsRepository
+            .findByPlayerAndSeason(player, season)
+            .orElseGet(() -> {
+                PlayerStats newStats = new PlayerStats();
+                newStats.setPlayer(player);
+                newStats.setSeason(season);
+                return newStats;
+            });
 
     boolean isNew = existingStats.isEmpty();
 

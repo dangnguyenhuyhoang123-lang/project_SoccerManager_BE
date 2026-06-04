@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.ToString;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Entity
@@ -18,22 +19,41 @@ public class Referee {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column
+    @Column(name = "name")
     private String name;
 
-    @Column
-    private String nationality;
+    @Column(name = "date_of_birth")
+    private LocalDate dateOfBirth;
 
-    @Column
+    @Column(name = "birth_year")
     private Integer birthYear;
 
+    @Column(name = "nationality")
+    private String nationality;
+
+    @Column(name = "phone")
+    private String phone;
+
+    @Column(name = "email")
+    private String email;
+
+    @Column(name = "level")
+    private String level;
+
+    @Column(name = "certification")
+    private String certification;
 
     @Column(columnDefinition = "LONGTEXT")
     @Lob
     private String avatar;
 
-    @OneToMany(mappedBy = "referee", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    @ToString.Exclude // Quan trọng: Tránh lỗi StackOverflow khi in log
-    private List<MatchReferee> matchAssignments;
+    @Column(name = "status")
+    private String status = "ACTIVE";
 
+    @Column(columnDefinition = "TEXT")
+    private String note;
+
+    @OneToMany(mappedBy = "referee", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @ToString.Exclude
+    private List<MatchReferee> matchAssignments;
 }

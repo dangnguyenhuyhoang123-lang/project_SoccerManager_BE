@@ -3,6 +3,8 @@ package com.example.demo.entity;
 import jakarta.persistence.*;
 import lombok.Data;
 
+import java.time.LocalDateTime;
+
 @Entity
 @Table(name = "match_referee")
 @Data
@@ -21,4 +23,10 @@ public class MatchReferee {
     private Referee referee;
 
     private String role;
+
+    @Column(name = "assigned_at")
+    private LocalDateTime assignedAt;
+
+    @Column(columnDefinition = "TEXT")
+    private String note;
 }

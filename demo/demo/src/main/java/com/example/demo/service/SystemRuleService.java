@@ -111,7 +111,8 @@ public class SystemRuleService {
         );
 
         rule.setMaxSubstitution(request.getMaxSubstitution());
-        rule.setMinRegistrationPlayers(request.getMinRegistrationPlayers());
+        rule.setMinCoaches(request.getMinCoaches());
+        rule.setMaxCoaches(request.getMaxCoaches());
         rule.setMaxForeignPlayers(request.getMaxForeignPlayers());
         rule.setMaxForeignPlayersOnField(request.getMaxForeignPlayersOnField());
         rule.setMaxGoalMinute(request.getMaxGoalMinute());
@@ -121,6 +122,7 @@ public class SystemRuleService {
                         : "POINTS,GOAL_DIFFERENCE,GOALS_FOR,HEAD_TO_HEAD,DRAW_LOT"
         );
     }
+
 
     private void validateRequest(SystemRuleRequest request) {
 
@@ -147,10 +149,10 @@ public class SystemRuleService {
             throw new RuntimeException("Số cầu thủ tối thiểu không được lớn hơn tối đa");
         }
 
-        if (request.getMinRegistrationPlayers() != null
-                && request.getMaxPlayers() != null
-                && request.getMinRegistrationPlayers() > request.getMaxPlayers()) {
-            throw new RuntimeException("Số cầu thủ đăng ký tối thiểu không được lớn hơn số cầu thủ tối đa");
+        if (request.getMinCoaches() != null
+                && request.getMaxCoaches() != null
+                && request.getMinCoaches() > request.getMaxCoaches()) {
+            throw new RuntimeException("Số lượng ban huấn luyện tối thiểu không được lớn hơn tối đa");
         }
 
         if (request.getMaxForeignPlayers() != null
@@ -188,8 +190,12 @@ public class SystemRuleService {
             throw new RuntimeException("Số cầu thủ tối đa không được âm");
         }
 
-        if (request.getMinRegistrationPlayers() != null && request.getMinRegistrationPlayers() < 0) {
-            throw new RuntimeException("Số cầu thủ đăng ký tối thiểu không được âm");
+        if (request.getMinCoaches() != null && request.getMinCoaches() < 0) {
+            throw new RuntimeException("Số lượng ban huấn luyện tối thiểu không được âm");
+        }
+
+        if (request.getMaxCoaches() != null && request.getMaxCoaches() < 0) {
+            throw new RuntimeException("Số lượng ban huấn luyện tối đa không được âm");
         }
 
         if (request.getMaxForeignPlayers() != null && request.getMaxForeignPlayers() < 0) {
@@ -238,6 +244,7 @@ public class SystemRuleService {
 
         validateAllowedGoalTypes(request.getAllowedGoalTypes());
     }
+
     private void validateAllowedGoalTypes(String allowedGoalTypes) {
         if (allowedGoalTypes == null || allowedGoalTypes.isBlank()) {
             return;
@@ -286,13 +293,12 @@ public class SystemRuleService {
                 rule.getAllowedGoalTypes(),
                 rule.getStatus(),
                 rule.getMaxSubstitution(),
-                rule.getMinRegistrationPlayers(),
+                rule.getMinCoaches(),
+                rule.getMaxCoaches(),
                 rule.getMaxForeignPlayers(),
                 rule.getMaxForeignPlayersOnField(),
                 rule.getMaxGoalMinute(),
                 rule.getRankingCriteriaOrder()
-
-
 
         );
     }

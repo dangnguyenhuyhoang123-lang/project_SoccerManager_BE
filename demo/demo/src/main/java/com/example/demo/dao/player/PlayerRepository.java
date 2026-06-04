@@ -1,9 +1,7 @@
 package com.example.demo.dao.player;
 
 import com.example.demo.dto.PlayerSearchResponse;
-import com.example.demo.entity.Player;
-import com.example.demo.entity.PlayerSeason;
-import com.example.demo.entity.SeasonTeam;
+import com.example.demo.entity.*;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -35,6 +33,7 @@ public interface PlayerRepository extends JpaRepository<Player, Long> {
     Optional<Player> findByVpfPlayerSlug(String vpfPlayerSlug);
 
     Optional<Player> findByNormalizedNameAndDateOfBirth(String normalizedName, LocalDate dateOfBirth);
+
 
 
 //    @Query("""

@@ -30,7 +30,8 @@ public class SystemRuleResponse {
     private String status;
 
     private Integer maxSubstitution;
-    private Integer minRegistrationPlayers;
+    private Integer minCoaches;
+    private Integer maxCoaches;
     private Integer maxForeignPlayers;
 
     private Integer maxForeignPlayersOnField;

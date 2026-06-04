@@ -24,11 +24,15 @@ public interface PlayerStatsRepository extends JpaRepository<PlayerStats,Long> {
     // Tìm thông số của 1 cầu thủ trong 1 mùa nhất định để cập nhật real-time
     Optional<PlayerStats> findBySeasonIdAndPlayerId(Long seasonId, Long playerId);
 
-    Optional<PlayerStats> findByPlayerAndSeason(Player player, Season season);
+
 
     List<PlayerStats> findBySeasonId(Long seasonId);
 
     boolean existsByPlayerIdAndSeasonId(Long playerId, Long seasonId);
+
+    Optional<PlayerStats> findByPlayerAndSeason(Player player, Season season);
+
+    Optional<PlayerStats> findByPlayerIdAndSeasonId(Long playerId, Long seasonId);
 
     @Query("""
     SELECT ps

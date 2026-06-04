@@ -51,8 +51,11 @@ public class SystemRule {
     @Column(name = "max_substitution") // Số lượt thay người tối đa trong trận
     private Integer maxSubstitution;
 
-    @Column(name = "min_registration_players") // Số cầu thủ tối thiểu để được tham gia giải
-    private Integer minRegistrationPlayers;
+    @Column(name = "min_coaches")
+    private Integer minCoaches;
+
+    @Column(name = "max_coaches")
+    private Integer maxCoaches;
 
     @Column(name = "max_foreign_players")
     private Integer maxForeignPlayers; // Mặc định là 3
