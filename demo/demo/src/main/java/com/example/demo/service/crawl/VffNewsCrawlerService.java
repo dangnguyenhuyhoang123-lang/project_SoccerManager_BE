@@ -1,7 +1,9 @@
 package com.example.demo.service.crawl;
 
 import com.example.demo.dao.NewsArticleRepository;
+import com.example.demo.dto.RealtimeEventDTO;
 import com.example.demo.entity.news.NewsArticle;
+import com.example.demo.service.RealtimeEventService;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -12,6 +14,7 @@ import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashSet;
+import java.util.Objects;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -22,9 +25,14 @@ public class VffNewsCrawlerService {
             "https://www.vff.org.vn/chuyen-muc/tin-tuc/hoat-dong-vff/";
 
     private final NewsArticleRepository newsArticleRepository;
+    private final RealtimeEventService realtimeEventService;
 
-    public VffNewsCrawlerService(NewsArticleRepository newsArticleRepository) {
+    public VffNewsCrawlerService(
+            NewsArticleRepository newsArticleRepository,
+            RealtimeEventService realtimeEventService
+    ) {
         this.newsArticleRepository = newsArticleRepository;
+        this.realtimeEventService = realtimeEventService;
     }
 
     public void crawlLatestNews() {
@@ -50,6 +58,12 @@ public class VffNewsCrawlerService {
                 NewsArticle article = newsArticleRepository
                         .findBySourceUrl(crawledArticle.getSourceUrl())
                         .orElse(new NewsArticle());
+                boolean isNew = article.getId() == null;
+                boolean changed = isNew || hasArticleChanged(article, crawledArticle);
+
+                if (!changed) {
+                    continue;
+                }
 
                 article.setTitle(crawledArticle.getTitle());
                 article.setSummary(crawledArticle.getSummary());
@@ -60,12 +74,52 @@ public class VffNewsCrawlerService {
                 article.setContent(crawledArticle.getContent());
                 article.setSourceName(crawledArticle.getSourceName());
 
-                newsArticleRepository.save(article);
+                NewsArticle saved = newsArticleRepository.save(article);
+                sendNewsRealtimeEvent(saved.getId(), isNew ? "NEWS_CREATED" : "NEWS_UPDATED");
             }
 
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    private boolean hasArticleChanged(NewsArticle existing, NewsArticle crawled) {
+        return !Objects.equals(existing.getTitle(), crawled.getTitle())
+                || !Objects.equals(existing.getSummary(), crawled.getSummary())
+                || !Objects.equals(existing.getSourceUrl(), crawled.getSourceUrl())
+                || !Objects.equals(existing.getImageUrl(), crawled.getImageUrl())
+                || !Objects.equals(existing.getCategory(), crawled.getCategory())
+                || !Objects.equals(existing.getPublishedAt(), crawled.getPublishedAt())
+                || !Objects.equals(existing.getContent(), crawled.getContent())
+                || !Objects.equals(existing.getSourceName(), crawled.getSourceName());
+    }
+
+    private void sendNewsRealtimeEvent(Long newsId, String type) {
+        RealtimeEventDTO event = realtimeEvent(
+                type,
+                newsId,
+                "NEWS",
+                "REFETCH_NEWS"
+        );
+
+        realtimeEventService.sendToPublicNews(event);
+        realtimeEventService.sendToAdmins(event);
+    }
+
+    private RealtimeEventDTO realtimeEvent(
+            String type,
+            Long referenceId,
+            String referenceType,
+            String action
+    ) {
+        return new RealtimeEventDTO(
+                type,
+                referenceId,
+                referenceType,
+                action,
+                null,
+                LocalDateTime.now()
+        );
     }
 
     private Set<String> extractLatestArticleUrls(Document doc) {

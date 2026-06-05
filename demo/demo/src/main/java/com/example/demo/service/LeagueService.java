@@ -3,8 +3,10 @@ package com.example.demo.service;
 import com.example.demo.controller.LeagueController;
 import com.example.demo.dao.LeagueRepository;
 import com.example.demo.dao.season.SeasonRepository;
+import com.example.demo.dto.RealtimeEventDTO;
 import com.example.demo.entity.League;
 import com.example.demo.entity.Season;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -16,16 +18,14 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 
 @Service
+@RequiredArgsConstructor
 public class LeagueService {
 
     private final LeagueRepository leagueRepository;
     private final SeasonRepository seasonRepository;
+    private final RealtimeEventService realtimeEventService;
 
-    @Autowired
-    public LeagueService(LeagueRepository leagueRepository, SeasonRepository seasonRepository) {
-        this.leagueRepository = leagueRepository;
-        this.seasonRepository = seasonRepository;
-    }
+
 
     public Page<LeagueController.LeagueResponse> getLeagues(int page, int size, String search) {
         Pageable pageable = PageRequest.of(page, Math.min(size, 100));
@@ -56,21 +56,61 @@ public class LeagueService {
     public LeagueController.LeagueResponse create(LeagueController.LeagueRequest request) {
         League league = new League();
         applyLeagueRequest(league, request);
-        return toLeagueResponse(leagueRepository.save(league));
+
+        League saved = leagueRepository.save(league);
+
+        RealtimeEventDTO event = realtimeEvent(
+                "LEAGUE_CREATED",
+                saved.getId(),
+                "LEAGUE",
+                "REFETCH_LEAGUES"
+        );
+
+        realtimeEventService.sendToPublicLeagues(event);
+        realtimeEventService.sendToAdmins(event);
+
+        return toLeagueResponse(saved);
     }
+
 
     public LeagueController.LeagueResponse update(Long id, LeagueController.LeagueRequest request) {
         League league = findLeagueEntity(id);
         applyLeagueRequest(league, request);
-        return toLeagueResponse(leagueRepository.save(league));
+
+        League saved = leagueRepository.save(league);
+
+        RealtimeEventDTO event = realtimeEvent(
+                "LEAGUE_UPDATED",
+                saved.getId(),
+                "LEAGUE",
+                "REFETCH_LEAGUES"
+        );
+
+        realtimeEventService.sendToPublicLeagues(event);
+        realtimeEventService.sendToAdmins(event);
+
+        return toLeagueResponse(saved);
     }
+
 
     public void delete(Long id) {
         if (!leagueRepository.existsById(id)) {
             throw new ResourceNotFoundException("League not found with id = " + id);
         }
+
         leagueRepository.deleteById(id);
+
+        RealtimeEventDTO event = realtimeEvent(
+                "LEAGUE_DELETED",
+                id,
+                "LEAGUE",
+                "REFETCH_LEAGUES"
+        );
+
+        realtimeEventService.sendToPublicLeagues(event);
+        realtimeEventService.sendToAdmins(event);
     }
+
 
     private League findLeagueEntity(Long id) {
         return leagueRepository.findById(id)
@@ -126,4 +166,24 @@ public class LeagueService {
         List<T> content = start >= items.size() ? List.of() : items.subList(start, end);
         return new PageImpl<>(content, pageable, items.size());
     }
+
+
+
+
+    private RealtimeEventDTO realtimeEvent(
+            String type,
+            Long referenceId,
+            String referenceType,
+            String action
+    ) {
+        return new RealtimeEventDTO(
+                type,
+                referenceId,
+                referenceType,
+                action,
+                null,
+                java.time.LocalDateTime.now()
+        );
+    }
+
 }

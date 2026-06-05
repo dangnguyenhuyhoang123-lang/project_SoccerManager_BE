@@ -5,6 +5,7 @@ import com.example.demo.dao.team.TeamRepository;
 import com.example.demo.dto.PlayerDTO;
 import com.example.demo.dto.PlayerSearchResponse;
 import com.example.demo.dto.PlayerUpsertDTO;
+import com.example.demo.dto.RealtimeEventDTO;
 import com.example.demo.entity.Player;
 import com.example.demo.entity.team.Team;
 import jakarta.transaction.Transactional;
@@ -15,6 +16,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.rest.webmvc.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -22,11 +24,17 @@ public class PlayerService {
 
     private final PlayerRepository playerRepository;
     private final TeamRepository teamRepository;
+    private final RealtimeEventService realtimeEventService;
 
     @Autowired
-    public PlayerService(PlayerRepository playerRepository, TeamRepository teamRepository) {
+    public PlayerService(
+            PlayerRepository playerRepository,
+            TeamRepository teamRepository,
+            RealtimeEventService realtimeEventService
+    ) {
         this.playerRepository = playerRepository;
         this.teamRepository = teamRepository;
+        this.realtimeEventService = realtimeEventService;
     }
 
     public PlayerDTO getPlayerById(long playerId) {
@@ -82,7 +90,9 @@ public class PlayerService {
     {
         Player player = new Player();
         applyRequest(player, request);
-        return toDto(playerRepository.save(player));
+        Player saved = playerRepository.save(player);
+        sendPlayerRealtimeEvent(saved.getId(), saved.getTeam() != null ? saved.getTeam().getId() : null, "PLAYER_CREATED");
+        return toDto(saved);
     }
 
     @Transactional
@@ -90,16 +100,19 @@ public class PlayerService {
     {
         Player existing = findPlayerEntity(id);
         applyRequest(existing, request);
-        return toDto(playerRepository.save(existing));
+        Player saved = playerRepository.save(existing);
+        sendPlayerRealtimeEvent(saved.getId(), saved.getTeam() != null ? saved.getTeam().getId() : null, "PLAYER_UPDATED");
+        return toDto(saved);
     }
 
     @Transactional
     public void delete(Long id)
     {
-        if (!playerRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Player not found with id = " + id);
-        }
+        Player player = playerRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Player not found with id = " + id));
+        Long teamId = player.getTeam() != null ? player.getTeam().getId() : null;
         playerRepository.deleteById(id);
+        sendPlayerRealtimeEvent(id, teamId, "PLAYER_DELETED");
     }
 
     private Player findPlayerEntity(long playerId) {
@@ -123,6 +136,34 @@ public class PlayerService {
         player.setWeight(request.getWeight());
         player.setStatus(request.getStatus());
         player.setTeam(team);
+    }
+
+    private void sendPlayerRealtimeEvent(Long playerId, Long teamId, String type) {
+        RealtimeEventDTO event = realtimeEvent(
+                type,
+                playerId,
+                "PLAYER",
+                "REFETCH_PLAYERS"
+        );
+
+        realtimeEventService.sendToAdmins(event);
+        realtimeEventService.sendToClubManagerByTeamId(teamId, event);
+    }
+
+    private RealtimeEventDTO realtimeEvent(
+            String type,
+            Long referenceId,
+            String referenceType,
+            String action
+    ) {
+        return new RealtimeEventDTO(
+                type,
+                referenceId,
+                referenceType,
+                action,
+                null,
+                LocalDateTime.now()
+        );
     }
 
     private PlayerDTO toDto(Player player) {

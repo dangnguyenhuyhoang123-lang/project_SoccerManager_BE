@@ -189,6 +189,8 @@ public class MatchTacticsService {
 
             realtimeEventService.sendToUser(admin.getId(), event);
         }
+
+        realtimeEventService.sendToPublicMatch(matchId, event);
     }
 
     private String buildMatchName(Match match) {
@@ -534,6 +536,8 @@ public class MatchTacticsService {
         for (User admin : admins) {
             realtimeEventService.sendToUser(admin.getId(), event);
         }
+
+        realtimeEventService.sendToPublicMatch(matchId, event);
     }
 
     private RealtimeEventDTO realtimeEvent(

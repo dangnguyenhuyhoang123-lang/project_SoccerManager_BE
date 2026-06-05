@@ -88,6 +88,29 @@ public class MatchStatsService {
                     realtimeEvent("TEAM_STATS_UPDATED", seasonId, "TEAM_STATS", "REFETCH_TEAM_STATS")
             );
         }
+
+        RealtimeEventDTO publicStatsEvent = realtimeEvent(
+                "MATCH_STATS_UPDATED",
+                match.getId(),
+                "MATCH_STATS",
+                "REFETCH_MATCH_STATS"
+        );
+
+        realtimeEventService.sendToPublicMatch(match.getId(), publicStatsEvent);
+        if(seasonId!=null) {
+            RealtimeEventDTO publicTeamStatsEvent = realtimeEvent(
+                    "TEAM_STATS_UPDATED",
+                    seasonId,
+                    "TEAM_STATS",
+                    "REFETCH_TEAM_STATS"
+            );
+
+            realtimeEventService.sendToPublicStandings(seasonId, publicTeamStatsEvent);
+        }
+
+
+
+
     }
 
     private Set<Long> findRelatedUserIds(Match match) {

@@ -13,7 +13,14 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint("/ws")
-                .setAllowedOriginPatterns("http://localhost:5173", "http://localhost:3000")
+                .setAllowedOriginPatterns(
+                        "http://localhost:5173",
+                        "http://localhost:3000",
+                        "https://growing-purgatory-shifter.ngrok-free.dev",
+                        "https://*.ngrok-free.app",
+                        "https://*.ngrok-free.dev",
+                        "https://*.ngrok.app"
+                )
                 .withSockJS();
     }
 

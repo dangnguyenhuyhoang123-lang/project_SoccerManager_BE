@@ -3,6 +3,7 @@ package com.example.demo.service;
 import com.example.demo.controller.SystemRuleController;
 import com.example.demo.dao.SystemRuleRepository;
 import com.example.demo.dao.season.SeasonRepository;
+import com.example.demo.dto.RealtimeEventDTO;
 import com.example.demo.dto.systemrule.SystemRuleRequest;
 import com.example.demo.dto.systemrule.SystemRuleResponse;
 import com.example.demo.entity.GoalType;
@@ -16,6 +17,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.rest.webmvc.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 
@@ -25,6 +27,7 @@ public class SystemRuleService {
 
     private final SystemRuleRepository systemRuleRepository;
     private final SeasonRepository seasonRepository;
+    private final RealtimeEventService realtimeEventService;
     public Page<SystemRuleResponse> getAll(Pageable pageable) {
         return systemRuleRepository.findAll(pageable).map(this::toResponse);
     }
@@ -55,6 +58,7 @@ public class SystemRuleService {
         applyRequest(rule, request);
 
         SystemRule saved = systemRuleRepository.save(rule);
+        sendSystemRuleRealtimeEvent(saved.getId(), "SYSTEM_RULE_CREATED");
         return toResponse(saved);
     }
 
@@ -72,6 +76,7 @@ public class SystemRuleService {
         applyRequest(rule, request);
 
         SystemRule saved = systemRuleRepository.save(rule);
+        sendSystemRuleRealtimeEvent(saved.getId(), "SYSTEM_RULE_UPDATED");
         return toResponse(saved);
     }
 
@@ -86,6 +91,7 @@ public class SystemRuleService {
         }
 
         systemRuleRepository.deleteById(id);
+        sendSystemRuleRealtimeEvent(id, "SYSTEM_RULE_DELETED");
     }
 
     private void applyRequest(SystemRule rule, SystemRuleRequest request) {
@@ -120,6 +126,33 @@ public class SystemRuleService {
                 request.getRankingCriteriaOrder() != null && !request.getRankingCriteriaOrder().isBlank()
                         ? request.getRankingCriteriaOrder()
                         : "POINTS,GOAL_DIFFERENCE,GOALS_FOR,HEAD_TO_HEAD,DRAW_LOT"
+        );
+    }
+
+    private void sendSystemRuleRealtimeEvent(Long ruleId, String type) {
+        RealtimeEventDTO event = realtimeEvent(
+                type,
+                ruleId,
+                "SYSTEM_RULE",
+                "REFETCH_SYSTEM_RULES"
+        );
+
+        realtimeEventService.sendToAdmins(event);
+    }
+
+    private RealtimeEventDTO realtimeEvent(
+            String type,
+            Long referenceId,
+            String referenceType,
+            String action
+    ) {
+        return new RealtimeEventDTO(
+                type,
+                referenceId,
+                referenceType,
+                action,
+                null,
+                LocalDateTime.now()
         );
     }
 

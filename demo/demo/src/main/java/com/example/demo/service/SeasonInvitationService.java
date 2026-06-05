@@ -4,6 +4,7 @@ import com.example.demo.dao.SeasonInvitationRepository;
 import com.example.demo.dao.season.SeasonRepository;
 import com.example.demo.dao.team.TeamRepository;
 import com.example.demo.dao.user.UserRepository;
+import com.example.demo.dto.RealtimeEventDTO;
 import com.example.demo.dto.SeasonInvitationCreateRequest;
 import com.example.demo.dto.SeasonInvitationResponse;
 import com.example.demo.entity.Season;
@@ -28,6 +29,8 @@ public class SeasonInvitationService {
     private final SeasonRepository seasonRepository;
     private final TeamRepository teamRepository;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
+    private final RealtimeEventService realtimeEventService;
 
     @Transactional
     public SeasonInvitationResponse invite(Long seasonId, SeasonInvitationCreateRequest request) {
@@ -58,7 +61,33 @@ public class SeasonInvitationService {
                         : LocalDateTime.now().plusWeeks(2)
         );
 
-        return toResponse(invitationRepository.save(invitation));
+        SeasonInvitation saved =invitationRepository.save(invitation);
+
+//        Tìm user được mời tham gia lời giải và thông báo
+        User manager = findClubManagerByTeamId(team.getId());
+
+        RealtimeEventDTO event = realtimeEvent(
+                "SEASON_INVITATION_SENT",
+                saved.getId(),
+                "SEASON_INVITATION",
+                "REFETCH_INVITATIONS"
+        );
+
+        if (manager != null) {
+            notificationService.sendToUser(
+                    manager.getId(),
+                    "Bạn nhận được lời mời tham gia mùa giải",
+                    "CLB " + team.getName() + " được mời tham gia mùa giải " + season.getName() + ".",
+                    "SEASON_INVITATION_SENT",
+                    saved.getId(),
+                    "SEASON_INVITATION"
+            );
+
+            realtimeEventService.sendToUser(manager.getId(), event);
+        }
+
+
+        return toResponse(saved);
     }
 
     public List<SeasonInvitationResponse> getBySeason(Long seasonId) {
@@ -87,7 +116,39 @@ public class SeasonInvitationService {
         invitation.setStatus(InvitationStatus.ACCEPTED);
         invitation.setRespondedAt(LocalDateTime.now());
 
-        return toResponse(invitationRepository.save(invitation));
+        SeasonInvitation saved = invitationRepository.save(invitation);
+
+        RealtimeEventDTO adminEvent = realtimeEvent(
+                "SEASON_INVITATION_ACCEPTED",
+                saved.getId(),
+                "SEASON_INVITATION",
+                "REFETCH_INVITATIONS"
+        );
+
+        for (User admin : userRepository.findUsersByRoleName("ROLE_ADMIN")) {
+            notificationService.sendToUser(
+                    admin.getId(),
+                    "CLB đã chấp nhận lời mời",
+                    saved.getTeam().getName() + " đã chấp nhận tham gia mùa giải " + saved.getSeason().getName() + ".",
+                    "SEASON_INVITATION_ACCEPTED",
+                    saved.getId(),
+                    "SEASON_INVITATION"
+            );
+
+            realtimeEventService.sendToUser(admin.getId(), adminEvent);
+        }
+
+        realtimeEventService.sendToPublicLeagues(
+                realtimeEvent(
+                        "SEASON_TEAM_UPDATED",
+                        saved.getSeason().getId(),
+                        "SEASON_TEAM",
+                        "REFETCH_SEASON_TEAMS"
+                )
+        );
+
+
+        return toResponse(saved);
     }
 
     @Transactional
@@ -110,7 +171,30 @@ public class SeasonInvitationService {
         invitation.setRespondedAt(LocalDateTime.now());
         invitation.setResponseNote(note);
 
-        return toResponse(invitationRepository.save(invitation));
+        SeasonInvitation saved = invitationRepository.save(invitation);
+
+        RealtimeEventDTO adminEvent = realtimeEvent(
+                "SEASON_INVITATION_DECLINED",
+                saved.getId(),
+                "SEASON_INVITATION",
+                "REFETCH_INVITATIONS"
+        );
+
+        for (User admin : userRepository.findUsersByRoleName("ROLE_ADMIN")) {
+            notificationService.sendToUser(
+                    admin.getId(),
+                    "CLB đã từ chối lời mời",
+                    saved.getTeam().getName() + " đã từ chối tham gia mùa giải " + saved.getSeason().getName() + ".",
+                    "SEASON_INVITATION_DECLINED",
+                    saved.getId(),
+                    "SEASON_INVITATION"
+            );
+
+            realtimeEventService.sendToUser(admin.getId(), adminEvent);
+        }
+
+
+        return toResponse(saved);
     }
 
     private SeasonInvitation getInvitation(Long id) {
@@ -165,4 +249,30 @@ public class SeasonInvitationService {
                 invitation.getResponseNote()
         );
     }
+
+//  Tìm club manager
+    private User findClubManagerByTeamId(Long teamId) {
+        return userRepository.findClubManagerByTeamIdAndRoleName(teamId, "ROLE_CLUB_MANAGER")
+                .or(() -> userRepository.findClubManagerByTeamIdAndRoleName(teamId, "CLUB_MANAGER"))
+                .or(() -> userRepository.findFirstByTeamId(teamId))
+                .orElse(null);
+    }
+
+
+    private RealtimeEventDTO realtimeEvent(
+            String type,
+            Long referenceId,
+            String referenceType,
+            String action
+    ) {
+        return new RealtimeEventDTO(
+                type,
+                referenceId,
+                referenceType,
+                action,
+                null,
+                LocalDateTime.now()
+        );
+    }
+
 }

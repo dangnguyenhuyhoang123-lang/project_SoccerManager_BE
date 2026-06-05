@@ -152,13 +152,31 @@ public class MatchService {
             sendMatchCreatedNotifications(savedMatch);
         }
         if (savedMatch.getStatus() == MatchStatus.FINISHED) {
-            standingService.recalculateBySeason(savedMatch.getSeason().getId());
+            Long seasonId = savedMatch.getSeason().getId();
+
+            standingService.recalculateBySeason(seasonId);
+
+            RealtimeEventDTO standingEvent = realtimeEvent(
+                    "STANDING_UPDATED",
+                    seasonId,
+                    "STANDING",
+                    "REFETCH_STANDINGS"
+            );
+
+            realtimeEventService.sendToPublicStandings(seasonId, standingEvent);
         }
 
-        sendMatchEventToRelatedClubManagers(
-                savedMatch,
-                realtimeEvent("MATCH_CREATED", savedMatch.getId(), "MATCH", "REFETCH_MATCHES")
+        RealtimeEventDTO matchCreatedEvent = realtimeEvent(
+                "MATCH_CREATED",
+                savedMatch.getId(),
+                "MATCH",
+                "REFETCH_MATCHES"
         );
+
+        sendMatchEventToRelatedClubManagers(savedMatch, matchCreatedEvent);
+
+        realtimeEventService.sendToPublicMatches(matchCreatedEvent);
+        realtimeEventService.sendToPublicMatch(savedMatch.getId(), matchCreatedEvent);
 
         return toDTO(savedMatch);
     }
@@ -276,6 +294,15 @@ public class MatchService {
                 savedMatch,
                 realtimeEvent("MATCH_UPDATED", savedMatch.getId(), "MATCH", "REFETCH_MATCHES")
         );
+        RealtimeEventDTO publicEvent = realtimeEvent(
+                "MATCH_UPDATED",
+                savedMatch.getId(),
+                "MATCH",
+                "REFETCH_MATCHES"
+        );
+
+        realtimeEventService.sendToPublicMatches(publicEvent);
+        realtimeEventService.sendToPublicMatch(savedMatch.getId(), publicEvent);
 
         return toDTO(savedMatch);
     }
@@ -298,6 +325,15 @@ public class MatchService {
                 clubManagerUserIds,
                 realtimeEvent("MATCH_DELETED", id, "MATCH", "REFETCH_MATCHES")
         );
+
+        RealtimeEventDTO publicEvent = realtimeEvent(
+                "MATCH_DELETED",
+                id,
+                "MATCH",
+                "REFETCH_MATCHES"
+        );
+
+        realtimeEventService.sendToPublicMatches(publicEvent);
     }
 
     private void applyRequest(Match match, MatchUpsertDTO request) {
@@ -429,12 +465,29 @@ public class MatchService {
                 realtimeEvent("MATCH_STATUS_UPDATED", savedMatch.getId(), "MATCH", "REFETCH_MATCHES")
         );
 
+        RealtimeEventDTO publicEvent = realtimeEvent(
+                "MATCH_STATUS_UPDATED",
+                savedMatch.getId(),
+                "MATCH",
+                "REFETCH_MATCHES"
+        );
+
+        realtimeEventService.sendToPublicMatches(publicEvent);
+        realtimeEventService.sendToPublicMatch(savedMatch.getId(), publicEvent);
+
         if (savedMatch.getStatus() == MatchStatus.FINISHED
                 && savedMatch.getSeason() != null) {
-            sendMatchEventToRelatedClubManagers(
-                    savedMatch,
-                    realtimeEvent("STANDING_UPDATED", savedMatch.getSeason().getId(), "STANDING", "REFETCH_STANDINGS")
+            Long seasonId = savedMatch.getSeason().getId();
+
+            RealtimeEventDTO standingEvent = realtimeEvent(
+                    "STANDING_UPDATED",
+                    seasonId,
+                    "STANDING",
+                    "REFETCH_STANDINGS"
             );
+
+            sendMatchEventToRelatedClubManagers(savedMatch, standingEvent);
+            realtimeEventService.sendToPublicStandings(seasonId, standingEvent);
         }
 
         return toDTO(savedMatch);

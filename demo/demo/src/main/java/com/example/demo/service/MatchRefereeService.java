@@ -3,17 +3,25 @@ package com.example.demo.service;
 import com.example.demo.dao.RefereeRepository;
 import com.example.demo.dao.match.MatchRefereeRepository;
 import com.example.demo.dao.match.MatchRepository;
+import com.example.demo.dao.user.UserRepository;
+import com.example.demo.dto.RealtimeEventDTO;
 import com.example.demo.dto.matchreferee.MatchRefereeAssignRequest;
 import com.example.demo.dto.matchreferee.MatchRefereeResponse;
 import com.example.demo.entity.Match;
 import com.example.demo.entity.MatchReferee;
 import com.example.demo.entity.Referee;
+import com.example.demo.entity.SeasonTeam;
+import com.example.demo.entity.team.Team;
+import com.example.demo.entity.user.User;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -22,6 +30,8 @@ public class MatchRefereeService {
     private final MatchRefereeRepository matchRefereeRepository;
     private final MatchRepository matchRepository;
     private final RefereeRepository refereeRepository;
+    private final UserRepository userRepository;
+    private final RealtimeEventService realtimeEventService;
 
     @Transactional
     public MatchRefereeResponse assign(MatchRefereeAssignRequest request) {
@@ -60,7 +70,10 @@ public class MatchRefereeService {
         assignment.setNote(trim(request.getNote()));
         assignment.setAssignedAt(LocalDateTime.now());
 
-        return toResponse(matchRefereeRepository.save(assignment));
+        MatchReferee saved = matchRefereeRepository.save(assignment);
+        sendMatchRefereeRealtimeEvents(match, "MATCH_REFEREE_ASSIGNED");
+
+        return toResponse(saved);
     }
 
     public List<MatchRefereeResponse> getByMatch(Long matchId) {
@@ -78,7 +91,94 @@ public class MatchRefereeService {
         if (id == null || id <= 0) throw new RuntimeException("id phân công trọng tài không hợp lệ");
         MatchReferee assignment = matchRefereeRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy phân công trọng tài id = " + id));
+        Match match = assignment.getMatch();
         matchRefereeRepository.delete(assignment);
+        sendMatchRefereeRealtimeEvents(match, "MATCH_REFEREE_REMOVED");
+    }
+
+    private void sendMatchRefereeRealtimeEvents(Match match, String type) {
+        if (match == null || match.getId() == null) {
+            return;
+        }
+
+        Long matchId = match.getId();
+        RealtimeEventDTO event = realtimeEvent(
+                type,
+                matchId,
+                "MATCH_REFEREE",
+                "REFETCH_MATCH_REFEREES"
+        );
+
+        RealtimeEventDTO detailEvent = realtimeEvent(
+                "MATCH_DETAIL_UPDATED",
+                matchId,
+                "MATCH",
+                "REFETCH_MATCH_DETAIL"
+        );
+
+        Set<Long> clubManagerUserIds = findRelatedClubManagerUserIds(match);
+
+        realtimeEventService.sendToAdmins(event);
+        realtimeEventService.sendToAdmins(detailEvent);
+        realtimeEventService.sendToUsers(clubManagerUserIds, event);
+        realtimeEventService.sendToUsers(clubManagerUserIds, detailEvent);
+        realtimeEventService.sendToPublicMatch(matchId, event);
+        realtimeEventService.sendToPublicMatch(matchId, detailEvent);
+    }
+
+    private Set<Long> findRelatedClubManagerUserIds(Match match) {
+        Set<Long> userIds = new LinkedHashSet<>();
+
+        findClubManagerBySeasonTeam(match.getHomeTeam())
+                .map(User::getId)
+                .ifPresent(userIds::add);
+        findClubManagerBySeasonTeam(match.getAwayTeam())
+                .map(User::getId)
+                .ifPresent(userIds::add);
+
+        return userIds;
+    }
+
+    private Optional<User> findClubManagerBySeasonTeam(SeasonTeam seasonTeam) {
+        if (seasonTeam == null || seasonTeam.getTeam() == null) {
+            return Optional.empty();
+        }
+
+        Team team = seasonTeam.getTeam();
+
+        Optional<User> managerOpt = userRepository.findClubManagerByTeamIdAndRoleName(
+                team.getId(),
+                "ROLE_CLUB_MANAGER"
+        );
+
+        if (managerOpt.isEmpty()) {
+            managerOpt = userRepository.findClubManagerByTeamIdAndRoleName(
+                    team.getId(),
+                    "CLUB_MANAGER"
+            );
+        }
+
+        if (managerOpt.isEmpty()) {
+            managerOpt = userRepository.findFirstByTeamId(team.getId());
+        }
+
+        return managerOpt;
+    }
+
+    private RealtimeEventDTO realtimeEvent(
+            String type,
+            Long referenceId,
+            String referenceType,
+            String action
+    ) {
+        return new RealtimeEventDTO(
+                type,
+                referenceId,
+                referenceType,
+                action,
+                null,
+                LocalDateTime.now()
+        );
     }
 
     private void validateAssignRequest(MatchRefereeAssignRequest request) {

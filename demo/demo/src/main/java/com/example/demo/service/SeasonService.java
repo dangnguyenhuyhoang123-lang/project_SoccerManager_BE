@@ -5,6 +5,7 @@ import com.example.demo.dao.LeagueRepository;
 import com.example.demo.dao.SystemRuleRepository;
 import com.example.demo.dao.season.SeasonRepository;
 import com.example.demo.dao.season.SeasonTeamRepository;
+import com.example.demo.dto.RealtimeEventDTO;
 import com.example.demo.entity.League;
 import com.example.demo.entity.Season;
 import com.example.demo.entity.SeasonTeam;
@@ -12,6 +13,7 @@ import com.example.demo.entity.Stadium;
 import com.example.demo.entity.SystemRule;
 import com.example.demo.entity.team.Team;
 import jakarta.transaction.Transactional;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -23,23 +25,16 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 
 @Service
+@RequiredArgsConstructor
 public class SeasonService {
 
     private final SeasonRepository seasonRepository;
     private final LeagueRepository leagueRepository;
     private final SystemRuleRepository systemRuleRepository;
     private final SeasonTeamRepository seasonTeamRepository;
+    private final RealtimeEventService realtimeEventService;
 
-    @Autowired
-    public SeasonService(SeasonRepository seasonRepository,
-                         LeagueRepository leagueRepository,
-                         SystemRuleRepository systemRuleRepository,
-                         SeasonTeamRepository seasonTeamRepository) {
-        this.seasonRepository = seasonRepository;
-        this.leagueRepository = leagueRepository;
-        this.systemRuleRepository = systemRuleRepository;
-        this.seasonTeamRepository = seasonTeamRepository;
-    }
+
 
     public Page<SeasonController.SeasonResponse> getSeasons(int page, int size, Long leagueId) {
         Pageable pageable = PageRequest.of(page, Math.min(size, 100));
@@ -68,13 +63,41 @@ public class SeasonService {
     public SeasonController.SeasonResponse create(SeasonController.SeasonRequest request) {
         Season season = new Season();
         applySeasonRequest(season, request);
-        return toSeasonResponse(seasonRepository.save(season));
+        Season saved = seasonRepository.save(season);
+
+
+
+        RealtimeEventDTO event = realtimeEvent(
+                "SEASON_CREATED",
+                saved.getId(),
+                "SEASON",
+                "REFETCH_SEASONS"
+        );
+
+        realtimeEventService.sendToPublicLeagues(event);
+        realtimeEventService.sendToAdmins(event);
+
+        return toSeasonResponse(saved);
+
     }
 
     public SeasonController.SeasonResponse update(Long id, SeasonController.SeasonRequest request) {
         Season season = findSeasonEntity(id);
         applySeasonRequest(season, request);
-        return toSeasonResponse(seasonRepository.save(season));
+        Season saved = seasonRepository.save(season);
+
+        RealtimeEventDTO event = realtimeEvent(
+                "SEASON_UPDATED",
+                saved.getId(),
+                "SEASON",
+                "REFETCH_SEASONS"
+        );
+
+        realtimeEventService.sendToPublicLeagues(event);
+        realtimeEventService.sendToAdmins(event);
+
+        return toSeasonResponse(saved);
+
     }
 
     public void delete(Long id) {
@@ -82,6 +105,17 @@ public class SeasonService {
             throw new ResourceNotFoundException("Season not found with id = " + id);
         }
         seasonRepository.deleteById(id);
+
+        RealtimeEventDTO event = realtimeEvent(
+                "SEASON_DELETED",
+                id,
+                "SEASON",
+                "REFETCH_SEASONS"
+        );
+
+        realtimeEventService.sendToPublicLeagues(event);
+        realtimeEventService.sendToAdmins(event);
+
     }
 
     private Season findSeasonEntity(Long id) {
@@ -180,6 +214,37 @@ public class SeasonService {
 
         Season saved = seasonRepository.save(season);
 
+
+
+        RealtimeEventDTO event = realtimeEvent(
+                "SEASON_RULE_ASSIGNED",
+                saved.getId(),
+                "SEASON",
+                "REFETCH_SEASONS"
+        );
+
+        realtimeEventService.sendToPublicLeagues(event);
+        realtimeEventService.sendToAdmins(event);
+
+
         return toSeasonResponse(saved);
     }
+
+
+    private RealtimeEventDTO realtimeEvent(
+            String type,
+            Long referenceId,
+            String referenceType,
+            String action
+    ) {
+        return new RealtimeEventDTO(
+                type,
+                referenceId,
+                referenceType,
+                action,
+                null,
+                java.time.LocalDateTime.now()
+        );
+    }
+
 }

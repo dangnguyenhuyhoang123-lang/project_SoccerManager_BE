@@ -2,6 +2,7 @@ package com.example.demo.service;
 
 import com.example.demo.dao.RefereeRepository;
 import com.example.demo.dao.match.MatchRefereeRepository;
+import com.example.demo.dto.RealtimeEventDTO;
 import com.example.demo.dto.referee.RefereeRequest;
 import com.example.demo.dto.referee.RefereeResponse;
 import com.example.demo.entity.Referee;
@@ -9,6 +10,7 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Service
@@ -16,6 +18,7 @@ import java.util.List;
 public class RefereeService {
     private final RefereeRepository refereeRepository;
     private final MatchRefereeRepository matchRefereeRepository;
+    private final RealtimeEventService realtimeEventService;
 
     public List<RefereeResponse> getAll() {
         return refereeRepository.findAll().stream().map(this::toResponse).toList();
@@ -29,14 +32,18 @@ public class RefereeService {
     public RefereeResponse create(RefereeRequest request) {
         Referee referee = new Referee();
         apply(referee, request);
-        return toResponse(refereeRepository.save(referee));
+        Referee saved = refereeRepository.save(referee);
+        sendRefereeRealtimeEvent(saved.getId(), "REFEREE_CREATED");
+        return toResponse(saved);
     }
 
     @Transactional
     public RefereeResponse update(Long id, RefereeRequest request) {
         Referee referee = findReferee(id);
         apply(referee, request);
-        return toResponse(refereeRepository.save(referee));
+        Referee saved = refereeRepository.save(referee);
+        sendRefereeRealtimeEvent(saved.getId(), "REFEREE_CREATED");
+        return toResponse(saved);
     }
 
     @Transactional
@@ -44,7 +51,8 @@ public class RefereeService {
         Referee referee = findReferee(id);
         if (matchRefereeRepository.existsByRefereeId(id)) {
             referee.setStatus("INACTIVE");
-            refereeRepository.save(referee);
+            Referee saved = refereeRepository.save(referee);
+            sendRefereeRealtimeEvent(saved.getId(), "REFEREE_UPDATED");
             return;
         }
         refereeRepository.delete(referee);
@@ -89,6 +97,35 @@ public class RefereeService {
                 referee.getId(), referee.getName(), referee.getDateOfBirth(), referee.getBirthYear(),
                 referee.getNationality(), referee.getPhone(), referee.getEmail(), referee.getLevel(),
                 referee.getCertification(), referee.getAvatar(), referee.getStatus(), referee.getNote()
+        );
+    }
+
+//    =======REALTIME DTO===========
+
+    private void sendRefereeRealtimeEvent(Long refereeId, String type) {
+        RealtimeEventDTO event = realtimeEvent(
+                type,
+                refereeId,
+                "REFEREE",
+                "REFETCH_REFEREES"
+        );
+
+        realtimeEventService.sendToAdmins(event);
+    }
+
+    private RealtimeEventDTO realtimeEvent(
+            String type,
+            Long referenceId,
+            String referenceType,
+            String action
+    ) {
+        return new RealtimeEventDTO(
+                type,
+                referenceId,
+                referenceType,
+                action,
+                null,
+                LocalDateTime.now()
         );
     }
 }

@@ -100,7 +100,11 @@ public class MatchEventService {
 
         playerStatsService.applyEvent(savedEvent, 1);
         recalculateMatchScore(matchId);
+
+
+
         sendMatchEventRealtimeEvents(matchId);
+
 
         return toResponse(savedEvent);
     }
@@ -223,22 +227,16 @@ public class MatchEventService {
         playerStatsService.applyEvent(savedEvent, 1);
 
         recalculateMatchScore(matchId);
+
+
+
+
         sendMatchEventRealtimeEvents(matchId);
 
         return toResponse(savedEvent);
     }
 
-//    @Transactional
-//    public void deleteEvent(Long matchId, Long eventId) {
-//        MatchEvent event = matchEventRepository.findById(eventId)
-//                .orElseThrow(() -> new RuntimeException("Không tìm thấy sự kiện id = " + eventId));
-//
-//        if (event.getMatch() == null || !event.getMatch().getId().equals(matchId)) {
-//            throw new RuntimeException("Sự kiện id = " + eventId + " không thuộc trận đấu id = " + matchId);
-//        }
-//
-//        matchEventRepository.delete(event);
-//    }
+
 
     @Transactional
     public void deleteEvent(Long matchId, Long eventId) {
@@ -252,6 +250,9 @@ public class MatchEventService {
         playerStatsService.applyEvent(event, -1);
         matchEventRepository.delete(event);
         recalculateMatchScore(matchId);
+
+
+
         sendMatchEventRealtimeEvents(matchId);
     }
 
@@ -427,27 +428,53 @@ public class MatchEventService {
 
     private void sendMatchEventRealtimeEvents(Long matchId) {
         Match match = matchRepository.findById(matchId)
-                .orElseThrow(() -> new RuntimeException("KhÃ´ng tÃ¬m tháº¥y tráº­n Ä‘áº¥u id = " + matchId));
+                .orElseThrow(() -> new RuntimeException("Khong tim thay tran dau id = " + matchId));
 
         Set<Long> userIds = findRelatedUserIds(match);
 
-        realtimeEventService.sendToUsers(
-                userIds,
-                realtimeEvent("MATCH_EVENT_CHANGED", matchId, "MATCH_EVENT", "REFETCH_MATCH_EVENTS")
+        RealtimeEventDTO matchEventChangedEvent = realtimeEvent(
+                "MATCH_EVENT_CHANGED",
+                matchId,
+                "MATCH_EVENT",
+                "REFETCH_MATCH_EVENTS"
         );
-        realtimeEventService.sendToUsers(
-                userIds,
-                realtimeEvent("MATCH_SCORE_UPDATED", matchId, "MATCH", "REFETCH_MATCH_DETAIL")
+
+        RealtimeEventDTO matchScoreUpdatedEvent = realtimeEvent(
+                "MATCH_SCORE_UPDATED",
+                matchId,
+                "MATCH",
+                "REFETCH_MATCH_DETAIL"
         );
+
+        // Gửi cho admin / club manager liên quan
+        realtimeEventService.sendToUsers(userIds, matchEventChangedEvent);
+        realtimeEventService.sendToUsers(userIds, matchScoreUpdatedEvent);
+
+        // Gửi cho public MatchDetail
+        realtimeEventService.sendToPublicMatch(matchId, matchEventChangedEvent);
+        realtimeEventService.sendToPublicMatch(matchId, matchScoreUpdatedEvent);
+
+        // Gửi cho public danh sách trận đấu
+        realtimeEventService.sendToPublicMatches(matchScoreUpdatedEvent);
 
         if (match.getStatus() == MatchStatus.FINISHED && match.getSeason() != null) {
             Long seasonId = match.getSeason().getId();
+
             playerSuspensionService.generateSuspensionsAfterMatch(match.getId());
             standingService.recalculateBySeason(seasonId);
-            realtimeEventService.sendToUsers(
-                    userIds,
-                    realtimeEvent("STANDING_UPDATED", seasonId, "STANDING", "REFETCH_STANDINGS")
+
+            RealtimeEventDTO standingUpdatedEvent = realtimeEvent(
+                    "STANDING_UPDATED",
+                    seasonId,
+                    "STANDING",
+                    "REFETCH_STANDINGS"
             );
+
+            // Gửi cho admin / club manager liên quan
+            realtimeEventService.sendToUsers(userIds, standingUpdatedEvent);
+
+            // Gửi cho public bảng xếp hạng
+            realtimeEventService.sendToPublicStandings(seasonId, standingUpdatedEvent);
         }
     }
 

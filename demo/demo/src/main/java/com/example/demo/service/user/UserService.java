@@ -3,6 +3,7 @@ package com.example.demo.service.user;
 import com.example.demo.dao.team.TeamRepository;
 import com.example.demo.dao.user.RoleRepository;
 import com.example.demo.dao.user.UserRepository;
+import com.example.demo.dto.RealtimeEventDTO;
 import com.example.demo.dto.user.CreateUserRequest;
 import com.example.demo.dto.user.UpdateUserInfoRequest;
 import com.example.demo.dto.user.UserDTO;
@@ -10,6 +11,7 @@ import com.example.demo.entity.team.Team;
 import com.example.demo.entity.message.ErrorMessage;
 import com.example.demo.entity.user.Role;
 import com.example.demo.entity.user.User;
+import com.example.demo.service.RealtimeEventService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +27,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -35,18 +38,21 @@ public class UserService {
     private final AuthenticationManager authenticationManager;
     private final RoleRepository roleRepository;
     private final TeamRepository teamRepository;
+    private final RealtimeEventService realtimeEventService;
 
     @Autowired
     public UserService(UserRepository userRepository,
                        PasswordEncoder passwordEncoder,
                        AuthenticationManager authenticationManager,
                        RoleRepository roleRepository,
-                       TeamRepository teamRepository) {
+                       TeamRepository teamRepository,
+                       RealtimeEventService realtimeEventService) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.authenticationManager = authenticationManager;
         this.roleRepository = roleRepository;
         this.teamRepository=teamRepository;
+        this.realtimeEventService = realtimeEventService;
     }
 
     public User findByUserName(String username)
@@ -87,7 +93,8 @@ public class UserService {
 
         user.getRoles().add(defaultRole);
 
-        userRepository.save(user);
+        User savedUser = userRepository.save(user);
+        sendUserRealtimeEvent(savedUser.getId(), "USER_CREATED");
         return ResponseEntity.ok("Success");
     }
 
@@ -225,6 +232,7 @@ public class UserService {
         }
 
         User savedUser = userRepository.save(user);
+        sendUserRealtimeEvent(savedUser.getId(), "USER_CREATED");
 
         return ResponseEntity.ok(toUserDto(savedUser));
     }
@@ -257,6 +265,7 @@ public class UserService {
         user.setRoles(roles);
 
         User savedUser = userRepository.save(user);
+        sendUserRealtimeEvent(savedUser.getId(), "USER_ROLE_UPDATED");
         return toUserDto(savedUser);
     }
 
@@ -271,6 +280,7 @@ public class UserService {
         user.setStatus(status);
 
         User savedUser = userRepository.save(user);
+        sendUserRealtimeEvent(savedUser.getId(), "USER_STATUS_UPDATED");
         return toUserDto(savedUser);
     }
     @Transactional
@@ -284,6 +294,7 @@ public class UserService {
         user.setAvatar(request.getAvatar());
 
         User savedUser = userRepository.save(user);
+        sendUserRealtimeEvent(savedUser.getId(), "USER_UPDATED");
 
         Long teamId = savedUser.getTeam() != null ? savedUser.getTeam().getId() : null;
 
@@ -307,6 +318,34 @@ public class UserService {
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy người dùng"));
 
         userRepository.delete(user);
+        sendUserRealtimeEvent(userId, "USER_DELETED");
+    }
+
+    private void sendUserRealtimeEvent(Long userId, String type) {
+        RealtimeEventDTO event = realtimeEvent(
+                type,
+                userId,
+                "USER",
+                "REFETCH_USERS"
+        );
+
+        realtimeEventService.sendToAdmins(event);
+    }
+
+    private RealtimeEventDTO realtimeEvent(
+            String type,
+            Long referenceId,
+            String referenceType,
+            String action
+    ) {
+        return new RealtimeEventDTO(
+                type,
+                referenceId,
+                referenceType,
+                action,
+                null,
+                LocalDateTime.now()
+        );
     }
 
 

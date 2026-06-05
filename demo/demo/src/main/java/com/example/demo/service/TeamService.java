@@ -4,6 +4,7 @@ import com.example.demo.controller.TeamController;
 import com.example.demo.dao.StadiumRepository;
 import com.example.demo.dao.season.SeasonTeamRepository;
 import com.example.demo.dao.team.TeamRepository;
+import com.example.demo.dto.RealtimeEventDTO;
 import com.example.demo.entity.SeasonTeam;
 import com.example.demo.entity.Stadium;
 import com.example.demo.entity.team.Team;
@@ -15,6 +16,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.rest.webmvc.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.List;
 
@@ -24,12 +26,19 @@ public class TeamService {
     private final TeamRepository teamRepository;
     private final StadiumRepository stadiumRepository;
     private final SeasonTeamRepository seasonTeamRepository;
+    private final RealtimeEventService realtimeEventService;
 
     @Autowired
-    public TeamService(TeamRepository teamRepository, StadiumRepository stadiumRepository, SeasonTeamRepository seasonTeamRepository) {
+    public TeamService(
+            TeamRepository teamRepository,
+            StadiumRepository stadiumRepository,
+            SeasonTeamRepository seasonTeamRepository,
+            RealtimeEventService realtimeEventService
+    ) {
         this.teamRepository = teamRepository;
         this.stadiumRepository = stadiumRepository;
         this.seasonTeamRepository = seasonTeamRepository;
+        this.realtimeEventService = realtimeEventService;
     }
 
     public Page<TeamController.TeamResponse> getTeams(int page, int size, String search, String city, Long seasonId) {
@@ -66,13 +75,17 @@ public class TeamService {
     public TeamController.TeamResponse create(TeamController.TeamRequest request) {
         Team team = new Team();
         applyRequest(team, request);
-        return toTeamResponse(teamRepository.save(team));
+        Team saved = teamRepository.save(team);
+        sendTeamRealtimeEvent(saved.getId(), "TEAM_CREATED");
+        return toTeamResponse(saved);
     }
 
     public TeamController.TeamResponse update(Long id, TeamController.TeamRequest request) {
         Team team = findTeamEntity(id);
         applyRequest(team, request);
-        return toTeamResponse(teamRepository.save(team));
+        Team saved = teamRepository.save(team);
+        sendTeamRealtimeEvent(saved.getId(), "TEAM_UPDATED");
+        return toTeamResponse(saved);
     }
 
     public void delete(Long id) {
@@ -80,6 +93,7 @@ public class TeamService {
             throw new ResourceNotFoundException("Team not found with id = " + id);
         }
         teamRepository.deleteById(id);
+        sendTeamRealtimeEvent(id, "TEAM_DELETED");
     }
 
     private Team findTeamEntity(Long id) {
@@ -100,6 +114,44 @@ public class TeamService {
         team.setDescription(request.description());
         team.setStatus(request.status());
         team.setStadium(stadium);
+    }
+
+    private void sendTeamRealtimeEvent(Long teamId, String type) {
+        RealtimeEventDTO event = realtimeEvent(
+                type,
+                teamId,
+                "TEAM",
+                "REFETCH_TEAMS"
+        );
+
+        realtimeEventService.sendToAdmins(event);
+        realtimeEventService.sendToClubManagerByTeamId(teamId, event);
+        realtimeEventService.sendToPublicLeagues(event);
+
+        RealtimeEventDTO matchListEvent = realtimeEvent(
+                type,
+                teamId,
+                "TEAM",
+                "REFETCH_MATCHES"
+        );
+
+        realtimeEventService.sendToPublicMatches(matchListEvent);
+    }
+
+    private RealtimeEventDTO realtimeEvent(
+            String type,
+            Long referenceId,
+            String referenceType,
+            String action
+    ) {
+        return new RealtimeEventDTO(
+                type,
+                referenceId,
+                referenceType,
+                action,
+                null,
+                LocalDateTime.now()
+        );
     }
 
     private boolean hasText(String value) {
