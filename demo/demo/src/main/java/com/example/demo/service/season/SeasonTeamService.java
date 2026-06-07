@@ -9,6 +9,7 @@ import com.example.demo.entity.season.Season;
 import com.example.demo.entity.season.SeasonTeam;
 import com.example.demo.entity.team.Team;
 import com.example.demo.entity.registerclub.RegistrationTeam;
+import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -71,6 +72,31 @@ public class SeasonTeamService {
         return toResponse(seasonTeamRepository.save(seasonTeam));
     }
 
+    @Transactional
+    public SeasonTeamController.SeasonTeamResponse updateStatus(Long id, String status) {
+        SeasonTeam seasonTeam = seasonTeamRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đội trong mùa giải"));
+
+        String normalizedStatus = normalizeStatus(status);
+        seasonTeam.setStatus(normalizedStatus);
+
+        SeasonTeam savedSeasonTeam = seasonTeamRepository.save(seasonTeam);
+        // TODO: Recalculate standings after status change when this endpoint should depend on ranking rule validation.
+        return toResponse(savedSeasonTeam);
+    }
+
+    public SeasonTeam getActiveSeasonTeamOrThrow(Long seasonId, Long teamId) {
+        SeasonTeam seasonTeam = seasonTeamRepository.findBySeasonIdAndTeamId(seasonId, teamId)
+                .orElseThrow(() -> new RuntimeException("Đội bóng không thuộc mùa giải này"));
+
+        String status = seasonTeam.getStatus();
+        if (status != null && !status.isBlank() && !"ACTIVE".equalsIgnoreCase(status)) {
+            throw new RuntimeException("Đội bóng đã bị vô hiệu hóa trong mùa giải này");
+        }
+
+        return seasonTeam;
+    }
+
     public void delete(Long id) {
         if (!seasonTeamRepository.existsById(id)) {
             throw new ResourceNotFoundException("Season team not found with id = " + id);
@@ -97,6 +123,19 @@ public class SeasonTeamService {
         seasonTeam.setRegistrationTeam(registrationTeam);
         seasonTeam.setNotes(request.notes());
         seasonTeam.setStatus(request.status());
+    }
+
+    private String normalizeStatus(String status) {
+        if (status == null || status.isBlank()) {
+            throw new RuntimeException("Trạng thái đội trong mùa giải không hợp lệ");
+        }
+
+        String normalizedStatus = status.trim().toUpperCase();
+        if (!"ACTIVE".equals(normalizedStatus) && !"INACTIVE".equals(normalizedStatus)) {
+            throw new RuntimeException("Trạng thái đội trong mùa giải không hợp lệ");
+        }
+
+        return normalizedStatus;
     }
 
     private SeasonTeamController.SeasonTeamResponse toResponse(SeasonTeam seasonTeam) {

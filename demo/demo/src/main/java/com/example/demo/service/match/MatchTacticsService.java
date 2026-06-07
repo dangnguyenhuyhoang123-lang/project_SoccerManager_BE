@@ -22,6 +22,7 @@ import com.example.demo.entity.user.User;
 import com.example.demo.service.realtime.NotificationService;
 import com.example.demo.service.team.player.PlayerStatsService;
 import com.example.demo.service.realtime.RealtimeEventService;
+import com.example.demo.service.season.SeasonTeamService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -44,6 +45,7 @@ public class MatchTacticsService {
     private final RealtimeEventService realtimeEventService;
     private final UserRepository userRepository;
     private final PlayerSuspensionRepository playerSuspensionRepository;
+    private final SeasonTeamService seasonTeamService;
 
 
 //  ==================== QUERY METHODS ====================
@@ -142,6 +144,12 @@ public class MatchTacticsService {
             throw new RuntimeException("Tactics id = " + tacticsId + " không thuộc trận đấu id = " + matchId);
         }
 
+        if (tactics.getTeam() == null || tactics.getTeam().getId() == null) {
+            throw new RuntimeException("Đội bóng không thuộc trận đấu này.");
+        }
+
+        validateActiveSeasonTeamForTactic(tactics.getMatch(), tactics.getTeam().getId());
+
         Long seasonId = tactics.getMatch().getSeason() != null ? tactics.getMatch().getSeason().getId() : null;
 
         matchTacticsRepository.delete(tactics);
@@ -159,6 +167,9 @@ public class MatchTacticsService {
                 .orElseThrow(() -> new RuntimeException(
                         "Không tìm thấy đội hình của teamId = " + teamId + " trong matchId = " + matchId
                 ));
+
+        Match match = tactics.getMatch() != null ? tactics.getMatch() : getMatchOrThrow(matchId);
+        validateActiveSeasonTeamForLineup(match, teamId);
 
         Long seasonId = tactics.getMatch() != null && tactics.getMatch().getSeason() != null
                 ? tactics.getMatch().getSeason().getId()
@@ -256,6 +267,7 @@ public class MatchTacticsService {
 
          Match match = getMatchOrThrow(matchId);
          Team team = getTeamOrThrow(teamId);
+         validateActiveSeasonTeamForLineup(match, teamId);
          SystemRule rule = getRequiredRule(match.getSeason());
 
          validateLineupRequest(match, team, request, rule);
@@ -388,6 +400,65 @@ public class MatchTacticsService {
 //    =================== VALIDATE HELPERS=======================
 
 //    Hàm tổng hợp validate
+    private void validateActiveSeasonTeamForLineup(Match match, Long teamId) {
+        validateActiveSeasonTeamForWrite(
+                match,
+                teamId,
+                "Đội bóng đã bị vô hiệu hóa trong mùa giải này, không thể cập nhật."
+        );
+    }
+
+    private void validateActiveSeasonTeamForTactic(Match match, Long teamId) {
+        validateActiveSeasonTeamForWrite(
+                match,
+                teamId,
+                "Đội bóng đã bị vô hiệu hóa trong mùa giải này, không thể cập nhật chiến thuật."
+        );
+    }
+
+    private void validateActiveSeasonTeamForWrite(Match match, Long teamId, String inactiveMessage) {
+        if (match.getSeason() == null || match.getSeason().getId() == null) {
+            throw new RuntimeException("Trận đấu chưa có thông tin mùa giải hợp lệ.");
+        }
+
+        if (!isTeamInMatch(match, teamId)) {
+            throw new RuntimeException("Đội bóng không thuộc trận đấu này.");
+        }
+
+        try {
+            seasonTeamService.getActiveSeasonTeamOrThrow(match.getSeason().getId(), teamId);
+        } catch (RuntimeException ex) {
+            if (isInactiveSeasonTeamError(ex)) {
+                throw new RuntimeException(inactiveMessage);
+            }
+            throw ex;
+        }
+    }
+
+    private boolean isTeamInMatch(Match match, Long teamId) {
+        if (teamId == null) {
+            return false;
+        }
+
+        Long homeTeamId = match.getHomeTeam() != null && match.getHomeTeam().getTeam() != null
+                ? match.getHomeTeam().getTeam().getId()
+                : null;
+        Long awayTeamId = match.getAwayTeam() != null && match.getAwayTeam().getTeam() != null
+                ? match.getAwayTeam().getTeam().getId()
+                : null;
+
+        return teamId.equals(homeTeamId) || teamId.equals(awayTeamId);
+    }
+
+    private boolean isInactiveSeasonTeamError(RuntimeException ex) {
+        String message = ex.getMessage();
+        return message != null
+                && (message.contains("vô hiệu")
+                || message.contains("vÃ´")
+                || message.contains("hiệu hóa")
+                || message.contains("hiá»‡u hÃ³a"));
+    }
+
     private void validateLineupRequest(
             Match match,
             Team team,

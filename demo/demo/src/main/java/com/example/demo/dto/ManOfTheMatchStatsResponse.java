@@ -10,6 +10,8 @@ import lombok.NoArgsConstructor;
 public class ManOfTheMatchStatsResponse {
     private Long playerId;
     private String playerName;
+    private Long teamId;
+    private String teamName;
     private Long seasonId;
     private Long awardCount;
 }

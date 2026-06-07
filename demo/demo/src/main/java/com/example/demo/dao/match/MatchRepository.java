@@ -231,29 +231,48 @@ WHERE (:status IS NULL OR m.status = :status)
 
     boolean existsBySeasonId(Long seasonId);
 
+//    @Query("""
+    //    SELECT m.manOfTheMatch.id,
+    //           m.manOfTheMatch.name,
+    //           COUNT(m)
+    //    FROM Match m
+    //    WHERE m.season.id = :seasonId
+    //      AND m.manOfTheMatch IS NOT NULL
+    //    GROUP BY m.manOfTheMatch.id, m.manOfTheMatch.name
+    //    ORDER BY COUNT(m) DESC
+    //""")
+    //    List<Object[]> countManOfTheMatchBySeason(@Param("seasonId") Long seasonId);
+
+
     @Query("""
-    SELECT m.manOfTheMatch.id,
-           m.manOfTheMatch.name,
+    SELECT p.id,
+           p.name,
+           ps.team.id,
+           ps.team.name,
            COUNT(m)
     FROM Match m
+    JOIN m.manOfTheMatch p
+    LEFT JOIN PlayerSeason ps
+           ON ps.player.id = p.id
+          AND ps.season.id = m.season.id
     WHERE m.season.id = :seasonId
       AND m.manOfTheMatch IS NOT NULL
-    GROUP BY m.manOfTheMatch.id, m.manOfTheMatch.name
+    GROUP BY p.id, p.name, ps.team.id, ps.team.name
     ORDER BY COUNT(m) DESC
 """)
     List<Object[]> countManOfTheMatchBySeason(@Param("seasonId") Long seasonId);
 
 
     @Query("""
-    SELECT m
-    FROM Match m
-    WHERE m.season.id = :seasonId
-      AND m.status = com.example.demo.entity.match.MatchStatus.FINISHED
-      AND (
-            (m.homeTeam.team.id = :teamAId AND m.awayTeam.team.id = :teamBId)
-         OR (m.homeTeam.team.id = :teamBId AND m.awayTeam.team.id = :teamAId)
-      )
-""")
+                SELECT m
+                FROM Match m
+                WHERE m.season.id = :seasonId
+                  AND m.status = com.example.demo.entity.match.MatchStatus.FINISHED
+                  AND (
+                        (m.homeTeam.team.id = :teamAId AND m.awayTeam.team.id = :teamBId)
+                     OR (m.homeTeam.team.id = :teamBId AND m.awayTeam.team.id = :teamAId)
+                  )
+            """)
     List<Match> findHeadToHeadMatches(
             @Param("seasonId") Long seasonId,
             @Param("teamAId") Long teamAId,

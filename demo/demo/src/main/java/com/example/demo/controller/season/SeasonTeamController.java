@@ -3,6 +3,7 @@ package com.example.demo.controller.season;
 import com.example.demo.service.season.SeasonTeamService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -40,6 +41,11 @@ public class SeasonTeamController {
     @PutMapping("/{id}")
     public SeasonTeamResponse updateSeasonTeam(@PathVariable Long id, @RequestBody SeasonTeamRequest request) {
         return seasonTeamService.update(id, request);
+    }
+
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<?> updateStatus(@PathVariable Long id, @RequestParam String status) {
+        return ResponseEntity.ok(seasonTeamService.updateStatus(id, status));
     }
 
     @DeleteMapping("/{id}")

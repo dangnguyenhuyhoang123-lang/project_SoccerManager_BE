@@ -27,6 +27,7 @@ import com.example.demo.service.realtime.NotificationService;
 import com.example.demo.service.team.player.PlayerSuspensionService;
 import com.example.demo.service.realtime.RealtimeEventService;
 import com.example.demo.service.season.StandingService;
+import com.example.demo.service.season.SeasonTeamService;
 import com.example.demo.service.ai.MatchPredictionService;
 import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
@@ -63,6 +64,7 @@ public class MatchService {
     private  final PlayerSuspensionService playerSuspensionService;
     private final PlayerRepository playerRepository;
     private final PlayerSeasonRepository playerSeasonRepository;
+    private final SeasonTeamService seasonTeamService;
 
 
 
@@ -146,8 +148,10 @@ public class MatchService {
                 .map(row -> new ManOfTheMatchStatsResponse(
                         ((Number) row[0]).longValue(),
                         (String) row[1],
+                        row[2] != null ? ((Number) row[2]).longValue() : null,
+                        row[3] != null ? (String) row[3] : null,
                         seasonId,
-                        ((Number) row[2]).longValue()
+                        ((Number) row[4]).longValue()
                 ))
                 .toList();
     }
@@ -169,6 +173,10 @@ public class MatchService {
     if (match.getStatus() == MatchStatus.SCHEDULED) {
         match.setHomeScore(null);
         match.setAwayScore(null);
+    }
+
+    if (isResultWrite(request)) {
+        validateBothTeamsActiveInMatchSeason(match);
     }
 
     Match savedMatch = matchRepository.save(match);
@@ -218,6 +226,10 @@ public class MatchService {
         applyRequest(existing, request);
         if (existing.getStadium() == null && existing.getHomeTeam() != null) {
             existing.setStadium(existing.getHomeTeam().getTeam().getStadium());
+        }
+
+        if (isResultWrite(request)) {
+            validateBothTeamsActiveInMatchSeason(existing);
         }
 
         Match savedMatch = matchRepository.save(existing);
@@ -287,6 +299,10 @@ public class MatchService {
             throw new RuntimeException("Trạng thái trận đấu không được để trống");
         }
 
+        if (request.getStatus() == MatchStatus.FINISHED) {
+            validateBothTeamsActiveInMatchSeason(match);
+        }
+
         match.setStatus(request.getStatus());
 
         Match savedMatch = matchRepository.save(match);
@@ -342,6 +358,8 @@ public class MatchService {
         Match match = matchRepository.findById(matchId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy trận đấu id = " + matchId));
 
+        validateBothTeamsActiveInMatchSeason(match);
+
         if (match.getSeason() == null) {
             throw new RuntimeException("Trận đấu chưa gắn mùa giải");
         }
@@ -394,7 +412,13 @@ public class MatchService {
     Season season = seasonRepository.findById(seasonId)
             .orElseThrow(() -> new RuntimeException("Không tìm thấy mùa giải id = " + seasonId));
 
-    List<SeasonTeam> teams = seasonTeamRepository.findBySeasonIdAndStatus(seasonId, "ACTIVE");
+    List<SeasonTeam> teams = seasonTeamRepository.findBySeasonId(seasonId).stream()
+            .filter(this::isActiveSeasonTeamForSchedule)
+            .toList();
+
+    if (teams.size() < 2) {
+        throw new RuntimeException("Không đủ đội bóng đang hoạt động để tạo lịch thi đấu.");
+    }
 
     if (teams.size() % 2 != 0) {
         throw new RuntimeException("Số đội phải là số chẵn để sinh lịch vòng tròn");
@@ -467,6 +491,16 @@ public class MatchService {
 
     return createdMatches.stream().map(this::toDTO).toList();
 }
+
+    private boolean isActiveSeasonTeamForSchedule(SeasonTeam seasonTeam) {
+        if (seasonTeam == null) {
+            return false;
+        }
+
+        String status = seasonTeam.getStatus();
+        return status == null || status.isBlank() || "ACTIVE".equalsIgnoreCase(status);
+    }
+
     private void rotateTeams(List<SeasonTeam> teams) {
         if (teams.size() <= 2) return;
 
@@ -562,6 +596,50 @@ public class MatchService {
 }
 
 // ==================== VALIDATION HELPERS ====================
+    private boolean isResultWrite(MatchUpsertDTO request) {
+        return request != null
+                && (request.getHomeScore() != null
+                || request.getAwayScore() != null
+                || request.getStatus() == MatchStatus.FINISHED);
+    }
+
+    private void validateBothTeamsActiveInMatchSeason(Match match) {
+        if (match == null || match.getSeason() == null || match.getSeason().getId() == null) {
+            throw new RuntimeException("Trận đấu chưa có thông tin mùa giải hợp lệ.");
+        }
+
+        Long seasonId = match.getSeason().getId();
+        Long homeTeamId = match.getHomeTeam() != null && match.getHomeTeam().getTeam() != null
+                ? match.getHomeTeam().getTeam().getId()
+                : null;
+        Long awayTeamId = match.getAwayTeam() != null && match.getAwayTeam().getTeam() != null
+                ? match.getAwayTeam().getTeam().getId()
+                : null;
+
+        if (homeTeamId == null || awayTeamId == null) {
+            throw new RuntimeException("Trận đấu chưa có đủ thông tin đội bóng.");
+        }
+
+        try {
+            seasonTeamService.getActiveSeasonTeamOrThrow(seasonId, homeTeamId);
+            seasonTeamService.getActiveSeasonTeamOrThrow(seasonId, awayTeamId);
+        } catch (RuntimeException ex) {
+            if (isInactiveSeasonTeamError(ex)) {
+                throw new RuntimeException("Trận đấu có đội bóng đã bị vô hiệu hóa trong mùa giải này, không thể cập nhật kết quả.");
+            }
+            throw ex;
+        }
+    }
+
+    private boolean isInactiveSeasonTeamError(RuntimeException ex) {
+        String message = ex.getMessage();
+        return message != null
+                && (message.contains("vô hiệu")
+                || message.contains("vÃ´")
+                || message.contains("hiệu hóa")
+                || message.contains("hiá»‡u hÃ³a"));
+    }
+
     private void validateMatchRequest(MatchUpsertDTO request) {
     if (request == null) {
         throw new RuntimeException("Dữ liệu trận đấu không được để trống");

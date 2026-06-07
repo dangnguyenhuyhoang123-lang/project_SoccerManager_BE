@@ -14,6 +14,7 @@ import com.example.demo.entity.team.Team;
 import com.example.demo.entity.user.User;
 import com.example.demo.service.realtime.RealtimeEventService;
 import com.example.demo.service.team.TeamStatsService;
+import com.example.demo.service.season.SeasonTeamService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -34,6 +35,7 @@ public class MatchStatsService {
     private final TeamStatsService teamStatsService;
     private final UserRepository userRepository;
     private final RealtimeEventService realtimeEventService;
+    private final SeasonTeamService seasonTeamService;
 
 
     // ==================== QUERY METHODS ====================
@@ -54,6 +56,8 @@ public class MatchStatsService {
     public List<MatchStatsResponse> upsertMatchStats(Long matchId, List<MatchStatsUpsertRequest> requests) {
         Match match = matchRepository.findById(matchId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy trận đấu id = " + matchId));
+
+        validateBothTeamsActiveInMatchSeason(match);
 
         for (MatchStatsUpsertRequest request : requests) {
             Team team = teamRepository.findById(request.getTeamId())
@@ -99,6 +103,43 @@ public class MatchStatsService {
 
 
 //  =================== VALIDATE HELPERS=======================
+
+    private void validateBothTeamsActiveInMatchSeason(Match match) {
+        if (match == null || match.getSeason() == null || match.getSeason().getId() == null) {
+            throw new RuntimeException("Trận đấu chưa có thông tin mùa giải hợp lệ.");
+        }
+
+        Long seasonId = match.getSeason().getId();
+        Long homeTeamId = match.getHomeTeam() != null && match.getHomeTeam().getTeam() != null
+                ? match.getHomeTeam().getTeam().getId()
+                : null;
+        Long awayTeamId = match.getAwayTeam() != null && match.getAwayTeam().getTeam() != null
+                ? match.getAwayTeam().getTeam().getId()
+                : null;
+
+        if (homeTeamId == null || awayTeamId == null) {
+            throw new RuntimeException("Trận đấu chưa có đủ thông tin đội bóng.");
+        }
+
+        try {
+            seasonTeamService.getActiveSeasonTeamOrThrow(seasonId, homeTeamId);
+            seasonTeamService.getActiveSeasonTeamOrThrow(seasonId, awayTeamId);
+        } catch (RuntimeException ex) {
+            if (isInactiveSeasonTeamError(ex)) {
+                throw new RuntimeException("Trận đấu có đội bóng đã bị vô hiệu hóa trong mùa giải này, không thể cập nhật kết quả.");
+            }
+            throw ex;
+        }
+    }
+
+    private boolean isInactiveSeasonTeamError(RuntimeException ex) {
+        String message = ex.getMessage();
+        return message != null
+                && (message.contains("vô hiệu")
+                || message.contains("vÃ´")
+                || message.contains("hiệu hóa")
+                || message.contains("hiá»‡u hÃ³a"));
+    }
 
     private void validateTeamBelongsToMatch(Match match, Team team) {
         Long homeTeamId = match.getHomeTeam().getTeam().getId();

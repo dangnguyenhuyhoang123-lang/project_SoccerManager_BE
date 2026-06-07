@@ -24,6 +24,8 @@ public interface SeasonTeamRepository extends JpaRepository<SeasonTeam, Long> {
 
     Page<SeasonTeam> findBySeasonIdAndTeamId(Long seasonId, Long teamId, Pageable pageable);
 
+    Optional<SeasonTeam> findBySeasonIdAndTeamId(Long seasonId, Long teamId);
+
     Optional<SeasonTeam> findOneBySeasonIdAndTeamId(Long seasonId, Long teamId);
 
     boolean existsBySeasonIdAndTeamId(Long seasonId, Long teamId);
@@ -31,5 +33,8 @@ public interface SeasonTeamRepository extends JpaRepository<SeasonTeam, Long> {
     Optional<SeasonTeam> findBySeasonAndTeam(Season season, Team team);
 
     Long countBySeasonId(Long seasonId);
+
     List<SeasonTeam> findBySeasonIdAndStatus(Long seasonId, String status);
+
+    List<SeasonTeam> findBySeasonIdAndStatusIgnoreCase(Long seasonId, String status);
 }

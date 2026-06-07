@@ -22,8 +22,10 @@ import org.springframework.stereotype.Service;
 
 
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 @Service
 @AllArgsConstructor
@@ -132,15 +134,16 @@ public class StandingService {
         // Lấy mùa giải và bộ luật tính điểm/xếp hạng
         Season season = getSeasonOrThrow(seasonId);
         SystemRule rule = getActiveSystemRuleOrThrow(season);
+        List<SeasonTeam> activeSeasonTeams = getActiveSeasonTeams(seasonId);
 
         // Đảm bảo mọi CLB tham gia mùa giải đều có dòng Standing và reset số liệu về 0
-        initializeAndResetStandings(season);
+        initializeAndResetStandings(season, activeSeasonTeams);
 
         // Cộng kết quả các trận đã kết thúc vào bảng xếp hạng
-        applyFinishedMatchesToStandings(seasonId, rule);
+        applyFinishedMatchesToStandings(seasonId, rule, activeSeasonTeams);
 
         // Sắp xếp bảng xếp hạng và cập nhật thứ hạng
-        List<Standing> sortedStandings = sortAndAssignRanks(season);
+        List<Standing> sortedStandings = sortAndAssignRanks(season, activeSeasonTeams);
 
         // Lưu bảng xếp hạng sau khi tính toán
         standingRepository.saveAll(sortedStandings);
@@ -148,10 +151,12 @@ public class StandingService {
         return toStandingResponses(sortedStandings);
     }
 
-    private void initializeAndResetStandings(Season season) {
-        List<SeasonTeam> seasonTeams = seasonTeamRepository.findBySeasonId(season.getId());
-
+    private void initializeAndResetStandings(Season season, List<SeasonTeam> seasonTeams) {
         for (SeasonTeam seasonTeam : seasonTeams) {
+            if (seasonTeam.getTeam() == null) {
+                continue;
+            }
+
             Standing standing = getOrCreateStanding(season, seasonTeam.getTeam());
 
             resetStanding(standing);
@@ -255,14 +260,19 @@ public class StandingService {
      * Duyệt toàn bộ trận đã kết thúc của mùa giải và cộng kết quả vào bảng xếp hạng.
      * Các trận chưa có đủ tỉ số sẽ bị bỏ qua để tránh tính sai dữ liệu.
      */
-    private void applyFinishedMatchesToStandings(Long seasonId, SystemRule rule) {
+    private void applyFinishedMatchesToStandings(Long seasonId, SystemRule rule, List<SeasonTeam> activeSeasonTeams) {
         List<Match> finishedMatches = matchRepository.findBySeasonIdAndStatus(
                 seasonId,
                 MatchStatus.FINISHED
         );
+        Set<Long> activeSeasonTeamIds = toSeasonTeamIdSet(activeSeasonTeams);
 
         for (Match match : finishedMatches) {
             if (hasMissingScore(match)) {
+                continue;
+            }
+
+            if (!isMatchBetweenActiveSeasonTeams(match, activeSeasonTeamIds)) {
                 continue;
             }
 
@@ -313,10 +323,13 @@ public class StandingService {
      * điểm, hiệu số bàn thắng, số bàn thắng ghi được.
      * Nếu bằng cả 3 tiêu chí thì cho đồng hạng.
      */
-    private List<Standing> sortAndAssignRanks(Season season) {
+    private List<Standing> sortAndAssignRanks(Season season, List<SeasonTeam> activeSeasonTeams) {
         List<Standing> currentStandings = standingRepository.findBySeasonId(season.getId());
+        Set<Long> activeTeamIds = toTeamIdSet(activeSeasonTeams);
 
-        List<Standing> sortedStandings = sortInProgressStandings(currentStandings);
+        List<Standing> sortedStandings = sortInProgressStandings(currentStandings.stream()
+                .filter(standing -> standing.getTeam() != null && activeTeamIds.contains(standing.getTeam().getId()))
+                .toList());
 
         assignRanks(sortedStandings);
 
@@ -364,6 +377,51 @@ public class StandingService {
      */
     private boolean hasMissingScore(Match match) {
         return match.getHomeScore() == null || match.getAwayScore() == null;
+    }
+
+    private List<SeasonTeam> getActiveSeasonTeams(Long seasonId) {
+        return seasonTeamRepository.findBySeasonId(seasonId).stream()
+                .filter(this::isActiveSeasonTeam)
+                .toList();
+    }
+
+    private boolean isActiveSeasonTeam(SeasonTeam seasonTeam) {
+        if (seasonTeam == null) {
+            return false;
+        }
+
+        String status = seasonTeam.getStatus();
+        return status == null || status.isBlank() || "ACTIVE".equalsIgnoreCase(status);
+    }
+
+    private Set<Long> toSeasonTeamIdSet(List<SeasonTeam> seasonTeams) {
+        Set<Long> ids = new HashSet<>();
+        for (SeasonTeam seasonTeam : seasonTeams) {
+            if (seasonTeam.getId() != null) {
+                ids.add(seasonTeam.getId());
+            }
+        }
+        return ids;
+    }
+
+    private Set<Long> toTeamIdSet(List<SeasonTeam> seasonTeams) {
+        Set<Long> ids = new HashSet<>();
+        for (SeasonTeam seasonTeam : seasonTeams) {
+            if (seasonTeam.getTeam() != null && seasonTeam.getTeam().getId() != null) {
+                ids.add(seasonTeam.getTeam().getId());
+            }
+        }
+        return ids;
+    }
+
+    private boolean isMatchBetweenActiveSeasonTeams(Match match, Set<Long> activeSeasonTeamIds) {
+        Long homeSeasonTeamId = match.getHomeTeam() != null ? match.getHomeTeam().getId() : null;
+        Long awaySeasonTeamId = match.getAwayTeam() != null ? match.getAwayTeam().getId() : null;
+
+        return homeSeasonTeamId != null
+                && awaySeasonTeamId != null
+                && activeSeasonTeamIds.contains(homeSeasonTeamId)
+                && activeSeasonTeamIds.contains(awaySeasonTeamId);
     }
 
 

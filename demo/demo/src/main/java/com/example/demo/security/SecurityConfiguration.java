@@ -245,6 +245,10 @@ public class SecurityConfiguration {
                                 "/api/season-team-coaches/**"
                         ).hasRole("ADMIN")
 
+                        .requestMatchers(HttpMethod.PATCH,
+                                "/api/season-teams/*/status"
+                        ).hasRole("ADMIN")
+
                         .requestMatchers(HttpMethod.DELETE,
                                 "/api/season-teams/**",
                                 "/api/player-seasons/**",

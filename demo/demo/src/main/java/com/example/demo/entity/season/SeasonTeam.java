@@ -56,4 +56,11 @@ public class SeasonTeam extends BaseEntity {
 
     @Column(nullable = false)
     private String status;
+
+    @PrePersist
+    public void prePersist() {
+        if (status == null || status.isBlank()) {
+            status = "ACTIVE";
+        }
+    }
 }

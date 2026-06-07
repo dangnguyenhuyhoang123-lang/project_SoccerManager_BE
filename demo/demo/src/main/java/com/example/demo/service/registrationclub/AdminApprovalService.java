@@ -285,6 +285,12 @@ public class AdminApprovalService {
      * Tránh tạo trùng SeasonTeam cho cùng một CLB trong một mùa giải.
      */
     private void validateTeamNotAlreadyInSeason(Team team, Season season) {
+        seasonTeamRepository.findBySeasonIdAndTeamId(season.getId(), team.getId())
+                .filter(this::isInactiveSeasonTeam)
+                .ifPresent(seasonTeam -> {
+                    throw new RuntimeException("Đội bóng đã bị vô hiệu hóa trong mùa giải này, không thể duyệt đơn đăng ký.");
+                });
+
         if (seasonTeamRepository.existsBySeasonIdAndTeamId(season.getId(), team.getId())) {
             throw new RuntimeException("CLB này đã tham gia mùa giải");
         }
@@ -295,6 +301,12 @@ public class AdminApprovalService {
      * Kiểm tra mùa giải còn slot để nhận thêm CLB hay không.
      * Nếu rule có cấu hình maxTeams thì số đội hiện tại không được vượt quá giới hạn này.
      */
+    private boolean isInactiveSeasonTeam(SeasonTeam seasonTeam) {
+        return seasonTeam != null
+                && seasonTeam.getStatus() != null
+                && "INACTIVE".equalsIgnoreCase(seasonTeam.getStatus().trim());
+    }
+
     private void validateSeasonTeamLimit(Season season, SystemRule rule) {
         if (rule.getMaxTeams() == null) {
             return;

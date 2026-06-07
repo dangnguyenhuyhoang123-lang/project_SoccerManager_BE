@@ -16,6 +16,7 @@ import com.example.demo.entity.*;
 import com.example.demo.entity.player.Player;
 import com.example.demo.entity.registerclub.*;
 import com.example.demo.entity.season.Season;
+import com.example.demo.entity.season.SeasonTeam;
 import com.example.demo.entity.team.Coach;
 import com.example.demo.entity.team.Team;
 import com.example.demo.entity.team.TeamKit;
@@ -445,6 +446,11 @@ public class RegistrationService {
 
 
     private void validateBusinessRules(Team team, Season season, SystemRule rule) {
+        seasonTeamRepository.findBySeasonIdAndTeamId(season.getId(), team.getId())
+                .filter(this::isInactiveSeasonTeam)
+                .ifPresent(seasonTeam -> {
+                    throw new RuntimeException("Đội bóng đã bị vô hiệu hóa trong mùa giải này, không thể nộp đơn đăng ký.");
+                });
 
         if (seasonTeamRepository.existsBySeasonIdAndTeamId(season.getId(), team.getId())) {
             throw new IllegalArgumentException("Câu lạc bộ này đã tham gia mùa giải");
@@ -481,6 +487,12 @@ public class RegistrationService {
      * Kiểm tra CLB đã chấp nhận lời mời tham gia mùa giải hay chưa.
      * Chỉ khi lời mời ở trạng thái ACCEPTED thì CLB mới được nộp đơn đăng ký.
      */
+    private boolean isInactiveSeasonTeam(SeasonTeam seasonTeam) {
+        return seasonTeam != null
+                && seasonTeam.getStatus() != null
+                && "INACTIVE".equalsIgnoreCase(seasonTeam.getStatus().trim());
+    }
+
     private void validateAcceptedSeasonInvitation(Team team, Season season) {
         boolean hasAcceptedInvitation =
                 seasonInvitationRepository.existsBySeasonIdAndTeamIdAndStatusIn(

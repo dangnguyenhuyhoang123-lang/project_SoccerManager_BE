@@ -13,6 +13,7 @@ import com.example.demo.entity.match.MatchLineup;
 import com.example.demo.entity.match.MatchTactics;
 import com.example.demo.entity.player.Player;
 import com.example.demo.entity.team.Team;
+import com.example.demo.service.season.SeasonTeamService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.rest.webmvc.ResourceNotFoundException;
@@ -32,6 +33,7 @@ public class MatchLineupService {
     private final MatchRepository matchRepo;
     private final TeamRepository teamRepo;
     private final PlayerRepository playerRepo;
+    private final SeasonTeamService seasonTeamService;
 
     @Transactional
     public MatchLineupController.TeamLineupResponse submitLineup(MatchLineupSubmitDTO dto) {
@@ -39,6 +41,8 @@ public class MatchLineupService {
                 .orElseThrow(() -> new ResourceNotFoundException("Match not found with id = " + dto.getMatchId()));
         Team team = teamRepo.findById(dto.getTeamId())
                 .orElseThrow(() -> new ResourceNotFoundException("Team not found with id = " + dto.getTeamId()));
+
+        validateActiveSeasonTeamForLineup(match, dto.getTeamId());
 
         tacticsRepo.deleteByMatch_IdAndTeam_Id(dto.getMatchId(), dto.getTeamId());
 
@@ -88,12 +92,59 @@ public class MatchLineupService {
 
     @Transactional
     public void deleteLineup(Long matchId, Long teamId) {
+        Match match = matchRepo.findById(matchId)
+                .orElseThrow(() -> new ResourceNotFoundException("Match not found with id = " + matchId));
+        validateActiveSeasonTeamForLineup(match, teamId);
+
         if (tacticsRepo.findByMatch_IdAndTeam_Id(matchId, teamId).isEmpty()) {
             throw new ResourceNotFoundException(
                     "Lineup tactics not found for match id = " + matchId + " and team id = " + teamId
             );
         }
         tacticsRepo.deleteByMatch_IdAndTeam_Id(matchId, teamId);
+    }
+
+    private void validateActiveSeasonTeamForLineup(Match match, Long teamId) {
+        if (match.getSeason() == null || match.getSeason().getId() == null) {
+            throw new RuntimeException("Trận đấu chưa có thông tin mùa giải hợp lệ.");
+        }
+
+        if (!isTeamInMatch(match, teamId)) {
+            throw new RuntimeException("Đội bóng không thuộc trận đấu này.");
+        }
+
+        try {
+            seasonTeamService.getActiveSeasonTeamOrThrow(match.getSeason().getId(), teamId);
+        } catch (RuntimeException ex) {
+            if (isInactiveSeasonTeamError(ex)) {
+                throw new RuntimeException("Đội bóng đã bị vô hiệu hóa trong mùa giải này, không thể cập nhật đội hình.");
+            }
+            throw ex;
+        }
+    }
+
+    private boolean isTeamInMatch(Match match, Long teamId) {
+        if (teamId == null) {
+            return false;
+        }
+
+        Long homeTeamId = match.getHomeTeam() != null && match.getHomeTeam().getTeam() != null
+                ? match.getHomeTeam().getTeam().getId()
+                : null;
+        Long awayTeamId = match.getAwayTeam() != null && match.getAwayTeam().getTeam() != null
+                ? match.getAwayTeam().getTeam().getId()
+                : null;
+
+        return teamId.equals(homeTeamId) || teamId.equals(awayTeamId);
+    }
+
+    private boolean isInactiveSeasonTeamError(RuntimeException ex) {
+        String message = ex.getMessage();
+        return message != null
+                && (message.contains("vô hiệu")
+                || message.contains("vÃ´")
+                || message.contains("hiệu hóa")
+                || message.contains("hiá»‡u hÃ³a"));
     }
 
     private MatchLineup toMatchLineup(MatchTactics tactics, PlayerPositionDTO playerDto) {

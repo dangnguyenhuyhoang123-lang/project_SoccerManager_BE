@@ -20,6 +20,7 @@ import com.example.demo.service.team.player.PlayerStatsService;
 import com.example.demo.service.team.player.PlayerSuspensionService;
 import com.example.demo.service.realtime.RealtimeEventService;
 import com.example.demo.service.season.StandingService;
+import com.example.demo.service.season.SeasonTeamService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -41,6 +42,7 @@ public class MatchEventService {
     private final RealtimeEventService realtimeEventService;
     private final StandingService standingService;
     private final PlayerSuspensionService playerSuspensionService;
+    private final SeasonTeamService seasonTeamService;
 
 
 
@@ -130,6 +132,7 @@ public class MatchEventService {
     @Transactional
     public MatchEventResponse createEvent(Long matchId, MatchEventUpsertRequest request) {
         Match match = getMatchOrThrow(matchId);
+        validateBothTeamsActiveInMatchSeason(match);
         Team team = getTeamOrThrow(request != null ? request.getTeamId() : null);
 
         validateEventRequest(match, request, team, null);
@@ -165,6 +168,7 @@ public class MatchEventService {
         }
 
         Match match = getMatchOrThrow(matchId);
+        validateBothTeamsActiveInMatchSeason(match);
         Team team = getTeamOrThrow(request != null ? request.getTeamId() : null);
 
         validateEventRequest(match, request, team, eventId);
@@ -193,6 +197,7 @@ public class MatchEventService {
     @Transactional
     public void deleteEvent(Long matchId, Long eventId) {
         MatchEvent event = getMatchEventOrThrow(eventId);
+        validateBothTeamsActiveInMatchSeason(event.getMatch());
 
         if (event.getMatch() == null || !event.getMatch().getId().equals(matchId)) {
             throw new RuntimeException("Sự kiện id = " + eventId + " không thuộc trận đấu id = " + matchId);
@@ -233,6 +238,8 @@ public class MatchEventService {
     public void recalculateMatchScore(Long matchId) {
         Match match = matchRepository.findById(matchId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy trận đấu id = " + matchId));
+
+        validateBothTeamsActiveInMatchSeason(match);
 
         Long homeTeamId = match.getHomeTeam().getTeam().getId();
         Long awayTeamId = match.getAwayTeam().getTeam().getId();
@@ -275,6 +282,43 @@ public class MatchEventService {
 
 
 //  =================== VALIDATE HELPERS=======================
+
+    private void validateBothTeamsActiveInMatchSeason(Match match) {
+        if (match == null || match.getSeason() == null || match.getSeason().getId() == null) {
+            throw new RuntimeException("Trận đấu chưa có thông tin mùa giải hợp lệ.");
+        }
+
+        Long seasonId = match.getSeason().getId();
+        Long homeTeamId = match.getHomeTeam() != null && match.getHomeTeam().getTeam() != null
+                ? match.getHomeTeam().getTeam().getId()
+                : null;
+        Long awayTeamId = match.getAwayTeam() != null && match.getAwayTeam().getTeam() != null
+                ? match.getAwayTeam().getTeam().getId()
+                : null;
+
+        if (homeTeamId == null || awayTeamId == null) {
+            throw new RuntimeException("Trận đấu chưa có đủ thông tin đội bóng.");
+        }
+
+        try {
+            seasonTeamService.getActiveSeasonTeamOrThrow(seasonId, homeTeamId);
+            seasonTeamService.getActiveSeasonTeamOrThrow(seasonId, awayTeamId);
+        } catch (RuntimeException ex) {
+            if (isInactiveSeasonTeamError(ex)) {
+                throw new RuntimeException("Trận đấu có đội bóng đã bị vô hiệu hóa trong mùa giải này, không thể cập nhật kết quả.");
+            }
+            throw ex;
+        }
+    }
+
+    private boolean isInactiveSeasonTeamError(RuntimeException ex) {
+        String message = ex.getMessage();
+        return message != null
+                && (message.contains("vô hiệu")
+                || message.contains("vÃ´")
+                || message.contains("hiệu hóa")
+                || message.contains("hiá»‡u hÃ³a"));
+    }
 
 
 
