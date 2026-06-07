@@ -1,9 +1,6 @@
 package com.example.demo.dto.registrationclub;
 
-import com.example.demo.entity.GrassType;
-import jakarta.persistence.Column;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
+import com.example.demo.entity.team.GrassType;
 import lombok.Data;
 
 @Data

@@ -1,6 +1,6 @@
 package com.example.demo.controller;
 
-import com.example.demo.service.LeagueService;
+import com.example.demo.service.season.LeagueService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.*;

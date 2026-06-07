@@ -1,10 +1,8 @@
 package com.example.demo.entity.registerclub;
 
-import com.example.demo.entity.Coach;
+import com.example.demo.entity.team.Coach;
 import jakarta.persistence.*;
 import lombok.Data;
-
-import java.time.LocalDate;
 
 @Entity
 @Data

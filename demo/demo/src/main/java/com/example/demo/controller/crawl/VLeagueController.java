@@ -1,10 +1,6 @@
 package com.example.demo.controller.crawl;
 
-import com.example.demo.dao.match.MatchRepository;
-import com.example.demo.dao.season.SeasonRepository;
 import com.example.demo.dto.crawl.VLeagueMatchResponse;
-import com.example.demo.entity.Match;
-import com.example.demo.entity.Season;
 import com.example.demo.service.crawl.VLeagueQueryService;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;

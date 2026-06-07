@@ -1,7 +1,7 @@
 package com.example.demo.dao.match;
 
-import com.example.demo.entity.EventType;
-import com.example.demo.entity.MatchEvent;
+import com.example.demo.entity.match.EventType;
+import com.example.demo.entity.match.MatchEvent;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;

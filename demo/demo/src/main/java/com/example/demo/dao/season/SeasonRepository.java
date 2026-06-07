@@ -1,7 +1,7 @@
 package com.example.demo.dao.season;
 
 import com.example.demo.entity.League;
-import com.example.demo.entity.Season;
+import com.example.demo.entity.season.Season;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

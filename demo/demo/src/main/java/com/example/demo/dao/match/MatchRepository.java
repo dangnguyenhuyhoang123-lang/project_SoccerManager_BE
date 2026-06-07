@@ -1,8 +1,8 @@
 package com.example.demo.dao.match;
 
-import com.example.demo.entity.Match;
-import com.example.demo.entity.MatchStatus;
-import com.example.demo.entity.Season;
+import com.example.demo.entity.match.Match;
+import com.example.demo.entity.match.MatchStatus;
+import com.example.demo.entity.season.Season;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;
@@ -42,18 +42,6 @@ public interface MatchRepository extends JpaRepository<Match,Long> {
             Pageable pageable
     );
 
-
-//    @Query("SELECT m FROM Match m " +
-//            "JOIN FETCH m.homeTeam " +
-//            "JOIN FETCH m.awayTeam " +
-//            "JOIN FETCH m.stadium " +
-//            "WHERE m.league.id = :leagueId " +
-//            "AND (:seasonId IS NULL OR m.season.id = :seasonId) " +
-//            "AND (:roundId IS NULL OR m.round.id = :roundId) " +
-//            "ORDER BY m.matchDate ASC")
-//    List<Match> findMatchesCustom(@Param("leagueId") Long leagueId,
-//                                  @Param("seasonId") Long seasonId,
-//                                  @Param("roundId") Long roundId);
 
 
     // Lấy các trận đấu của một vòng đấu (Round)
@@ -174,7 +162,7 @@ public interface MatchRepository extends JpaRepository<Match,Long> {
     FROM Match m
     WHERE m.season.id = :seasonId
       AND m.matchDate > :currentMatchDate
-      AND m.status = com.example.demo.entity.MatchStatus.SCHEDULED
+      AND m.status = com.example.demo.entity.match.MatchStatus.SCHEDULED
       AND (
             m.homeTeam.id = :seasonTeamId
          OR m.awayTeam.id = :seasonTeamId
@@ -260,7 +248,7 @@ WHERE (:status IS NULL OR m.status = :status)
     SELECT m
     FROM Match m
     WHERE m.season.id = :seasonId
-      AND m.status = com.example.demo.entity.MatchStatus.FINISHED
+      AND m.status = com.example.demo.entity.match.MatchStatus.FINISHED
       AND (
             (m.homeTeam.team.id = :teamAId AND m.awayTeam.team.id = :teamBId)
          OR (m.homeTeam.team.id = :teamBId AND m.awayTeam.team.id = :teamAId)

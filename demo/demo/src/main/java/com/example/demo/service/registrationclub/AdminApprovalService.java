@@ -1,18 +1,23 @@
 package com.example.demo.service.registrationclub;
 
-import com.example.demo.dao.player.PlayerSeasonRepository;
+import com.example.demo.dao.team.player.PlayerSeasonRepository;
 import com.example.demo.dao.registerteam.RegistrationTeamRepository;
 import com.example.demo.dao.season.SeasonTeamCoachRepository;
 import com.example.demo.dao.season.SeasonTeamRepository;
 import com.example.demo.dao.user.UserRepository;
 import com.example.demo.dto.RealtimeEventDTO;
 import com.example.demo.entity.*;
+import com.example.demo.entity.player.Player;
+import com.example.demo.entity.season.PlayerSeason;
 import com.example.demo.entity.registerclub.*;
+import com.example.demo.entity.season.Season;
+import com.example.demo.entity.season.SeasonTeam;
+import com.example.demo.entity.season.SeasonTeamCoach;
 import com.example.demo.entity.team.Team;
 import com.example.demo.entity.user.User;
-import com.example.demo.service.NotificationService;
-import com.example.demo.service.RealtimeEventService;
-import com.example.demo.service.StandingService;
+import com.example.demo.service.realtime.NotificationService;
+import com.example.demo.service.realtime.RealtimeEventService;
+import com.example.demo.service.season.StandingService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -38,18 +43,31 @@ public class AdminApprovalService {
     private final NotificationService notificationService;
     private final RealtimeEventService realtimeEventService;
 
-    @Transactional
-    public void approveRegistration(Long registrationId) {
-        RegistrationTeam reg = registrationTeamRepository.findById(registrationId)
+
+
+
+    // ==================== QUERY METHODS ====================
+    /**
+     * Lấy đơn đăng ký theo id và đảm bảo đơn vẫn đang ở trạng thái chờ duyệt.
+     * Chỉ các đơn PENDING mới được phép duyệt.
+     */
+    private RegistrationTeam getPendingRegistrationOrThrow(Long registrationId) {
+        RegistrationTeam registration = registrationTeamRepository.findById(registrationId)
                 .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn đăng ký"));
 
-        if (reg.getStatus() != RegistrationStatus.PENDING) {
+        if (registration.getStatus() != RegistrationStatus.PENDING) {
             throw new RuntimeException("Đơn này đã được xử lý");
         }
 
-        Team team = reg.getTeam();
-        Season season = reg.getSeason();
+        return registration;
+    }
 
+
+    /**
+     * Lấy bộ luật đang áp dụng cho mùa giải.
+     * Chỉ cho phép xử lý hồ sơ nếu mùa giải đã có rule và rule đang ACTIVE.
+     */
+    private SystemRule getActiveSystemRuleOrThrow(Season season) {
         SystemRule rule = season.getSystemRule();
 
         if (rule == null) {
@@ -60,67 +78,245 @@ public class AdminApprovalService {
             throw new RuntimeException("Bộ luật của mùa giải đang tạm ngưng");
         }
 
+        return rule;
+    }
+
+
+// ==================== COMMAND METHODS ====================
+
+    @Transactional
+    public void approveRegistration(Long registrationId) {
+        // Lấy và kiểm tra đơn đăng ký đang ở trạng thái chờ duyệt
+        RegistrationTeam registration = getPendingRegistrationOrThrow(registrationId);
+
+        Team team = registration.getTeam();
+        Season season = registration.getSeason();
+
+        // Lấy bộ luật đang hoạt động của mùa giải
+        SystemRule rule = getActiveSystemRuleOrThrow(season);
+
+        // Kiểm tra các điều kiện trước khi duyệt đơn
+        validateRegistrationCanBeApproved(registration, team, season, rule);
+
+        // Tạo bản ghi CLB tham gia mùa giải
+        SeasonTeam seasonTeam = createSeasonTeam(registration, team, season);
+
+        // Tạo dữ liệu cầu thủ và HLV theo mùa giải
+        createPlayerSeasons(registration, team, season, seasonTeam);
+        createSeasonTeamCoaches(registration, team, season);
+
+        // Khởi tạo bảng xếp hạng cho CLB vừa được duyệt
+        initializeStandingForApprovedTeam(season, team);
+
+        // Cập nhật trạng thái đơn và gửi thông báo/realtime
+        RegistrationTeam savedRegistration = markRegistrationAsApproved(registration);
+        notifyRegistrationApproved(savedRegistration);
+    }
+
+    @Transactional
+    public void rejectRegistration(Long id, String reason) {
+        RegistrationTeam reg = registrationTeamRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn đăng ký"));
+
+        if (reg.getStatus() != RegistrationStatus.PENDING) {
+            throw new RuntimeException("Chỉ có thể từ chối đơn đang chờ duyệt");
+        }
+
+        reg.setStatus(RegistrationStatus.REJECTED);
+        reg.setRejectionReason(reason);
+
+        RegistrationTeam savedRegistration = registrationTeamRepository.save(reg);
+        notifyClubAboutRegistrationResult(savedRegistration, false, reason);
+        sendRegistrationResultEvents(savedRegistration, false);
+    }
+
+
+
+// ==================== BUSINESS HELPERS ====================
+
+    /**
+     * Tạo entity PlayerSeason từ một cầu thủ trong hồ sơ đăng ký.
+     */
+    private PlayerSeason buildPlayerSeason(
+            RegistrationPlayer registrationPlayer,
+            Team team,
+            Season season,
+            SeasonTeam seasonTeam
+    ) {
+        PlayerSeason playerSeason = new PlayerSeason();
+
+        playerSeason.setPlayer(registrationPlayer.getPlayer());
+        playerSeason.setTeam(team);
+        playerSeason.setSeason(season);
+        playerSeason.setShirtNumber(registrationPlayer.getShirtNumber());
+        playerSeason.setPrimaryPosition(registrationPlayer.getPosition());
+        playerSeason.setTeamSeason(seasonTeam);
+        playerSeason.setStatus("ACTIVE");
+
+        return playerSeason;
+    }
+
+
+    /**
+     * Tạo bản ghi CLB tham gia mùa giải sau khi hồ sơ được duyệt.
+     * SeasonTeam là dữ liệu nền để quản lý cầu thủ, HLV, đội hình và bảng xếp hạng theo mùa.
+     */
+    private SeasonTeam createSeasonTeam(
+            RegistrationTeam registration,
+            Team team,
+            Season season
+    ) {
+        SeasonTeam seasonTeam = new SeasonTeam();
+
+        seasonTeam.setTeam(team);
+        seasonTeam.setSeason(season);
+        seasonTeam.setRegistrationTeam(registration);
+        seasonTeam.setStatus("ACTIVE");
+
+        return seasonTeamRepository.save(seasonTeam);
+    }
+    /**
+     * Chuyển danh sách cầu thủ trong hồ sơ đăng ký thành PlayerSeason.
+     * PlayerSeason đại diện cho cầu thủ của một CLB trong một mùa giải cụ thể.
+     */
+    private void createPlayerSeasons(
+            RegistrationTeam registration,
+            Team team,
+            Season season,
+            SeasonTeam seasonTeam
+    ) {
+        for (RegistrationPlayer registrationPlayer : registration.getPlayers()) {
+            PlayerSeason playerSeason = buildPlayerSeason(
+                    registrationPlayer,
+                    team,
+                    season,
+                    seasonTeam
+            );
+
+            playerSeasonRepository.save(playerSeason);
+        }
+    }
+
+    /**
+     * Chuyển danh sách HLV trong hồ sơ đăng ký thành SeasonTeamCoach.
+     * SeasonTeamCoach lưu vai trò của HLV trong CLB ở mùa giải cụ thể.
+     */
+    private void createSeasonTeamCoaches(
+            RegistrationTeam registration,
+            Team team,
+            Season season
+    ) {
+        for (RegistrationCoach registrationCoach : registration.getCoaches()) {
+            SeasonTeamCoach seasonTeamCoach = buildSeasonTeamCoach(
+                    registrationCoach,
+                    team,
+                    season
+            );
+
+            seasonTeamCoachRepository.save(seasonTeamCoach);
+        }
+    }
+
+    /**
+     * Cập nhật trạng thái hồ sơ đăng ký sang APPROVED sau khi đã tạo xong dữ liệu mùa giải.
+     */
+    private RegistrationTeam markRegistrationAsApproved(RegistrationTeam registration) {
+        registration.setStatus(RegistrationStatus.APPROVED);
+        return registrationTeamRepository.save(registration);
+    }
+
+    /**
+     * Tạo entity SeasonTeamCoach từ một HLV trong hồ sơ đăng ký.
+     */
+    private SeasonTeamCoach buildSeasonTeamCoach(
+            RegistrationCoach registrationCoach,
+            Team team,
+            Season season
+    ) {
+        SeasonTeamCoach seasonTeamCoach = new SeasonTeamCoach();
+
+        seasonTeamCoach.setCoach(registrationCoach.getCoach());
+        seasonTeamCoach.setTeam(team);
+        seasonTeamCoach.setSeason(season);
+        seasonTeamCoach.setRole(registrationCoach.getTournamentRole());
+        seasonTeamCoach.setAssignedDate(LocalDate.now());
+        seasonTeamCoach.setStatus("ACTIVE");
+
+        return seasonTeamCoach;
+    }
+
+
+    /**
+     * Khởi tạo dòng bảng xếp hạng cho CLB vừa được duyệt tham gia mùa giải.
+     */
+    private void initializeStandingForApprovedTeam(Season season, Team team) {
+        standingService.initializeStanding(season.getId(), team.getId());
+    }
+
+
+// ==================== VALIDATION HELPERS ====================
+// Các hàm kiểm tra điều kiện, throw lỗi nếu không hợp lệ.
+
+    /**
+     * Kiểm tra toàn bộ điều kiện nghiệp vụ trước khi admin duyệt hồ sơ.
+     *
+     * Bao gồm:
+     * - CLB chưa tham gia mùa giải.
+     * - Mùa giải chưa vượt quá số đội tối đa.
+     * - CLB đã thanh toán lệ phí.
+     * - Danh sách cầu thủ và HLV hợp lệ theo rule.
+     */
+    private void validateRegistrationCanBeApproved(
+            RegistrationTeam registration,
+            Team team,
+            Season season,
+            SystemRule rule
+    ) {
+        validateTeamNotAlreadyInSeason(team, season);
+        validateSeasonTeamLimit(season, rule);
+        validateRegistrationFeePaid(registration);
+        validateRegistrationPlayersByRule(registration, rule, season);
+        validateNoDuplicateShirtNumbers(registration);
+        validateCoaches(registration, rule);
+    }
+
+    /**
+     * Đảm bảo CLB chưa được thêm vào mùa giải trước đó.
+     * Tránh tạo trùng SeasonTeam cho cùng một CLB trong một mùa giải.
+     */
+    private void validateTeamNotAlreadyInSeason(Team team, Season season) {
         if (seasonTeamRepository.existsBySeasonIdAndTeamId(season.getId(), team.getId())) {
             throw new RuntimeException("CLB này đã tham gia mùa giải");
         }
+    }
 
-        if (rule.getMaxTeams() != null) {
-            long currentTeamCount = seasonTeamRepository.countBySeasonId(season.getId());
 
-            if (currentTeamCount >= rule.getMaxTeams()) {
-                throw new RuntimeException("Mùa giải đã đạt số đội tối đa: " + rule.getMaxTeams());
-            }
+    /**
+     * Kiểm tra mùa giải còn slot để nhận thêm CLB hay không.
+     * Nếu rule có cấu hình maxTeams thì số đội hiện tại không được vượt quá giới hạn này.
+     */
+    private void validateSeasonTeamLimit(Season season, SystemRule rule) {
+        if (rule.getMaxTeams() == null) {
+            return;
         }
 
-        if (reg.getFeeStatus() != FeeStatus.PAID) {
+        long currentTeamCount = seasonTeamRepository.countBySeasonId(season.getId());
+
+        if (currentTeamCount >= rule.getMaxTeams()) {
+            throw new RuntimeException("Mùa giải đã đạt số đội tối đa: " + rule.getMaxTeams());
+        }
+    }
+
+
+    /**
+     * Chỉ cho phép duyệt hồ sơ khi CLB đã hoàn tất lệ phí tham gia giải.
+     */
+    private void validateRegistrationFeePaid(RegistrationTeam registration) {
+        if (registration.getFeeStatus() != FeeStatus.PAID) {
             throw new RuntimeException("CLB chưa hoàn tất lệ phí tham gia giải");
         }
-        validateRegistrationPlayersByRule(reg, rule, season);
-        validateNoDuplicateShirtNumbers(reg);
-        validateCoaches(reg, rule);
-        // 1. Đăng ký Đội vào mùa giải
-        SeasonTeam seasonTeam = new SeasonTeam();
-        seasonTeam.setTeam(team);
-        seasonTeam.setSeason(season);
-        seasonTeam.setRegistrationTeam(reg);
-        seasonTeam.setStatus("ACTIVE");
-        seasonTeamRepository.save(seasonTeam);
-
-        // 2. Đăng ký Cầu thủ vào mùa giải (PlayerSeason)
-        for (RegistrationPlayer regPlayer : reg.getPlayers()) {
-            PlayerSeason ps = new PlayerSeason();
-            ps.setPlayer(regPlayer.getPlayer());
-            ps.setTeam(team);
-            ps.setSeason(season);
-            ps.setShirtNumber(regPlayer.getShirtNumber());
-            ps.setPrimaryPosition(regPlayer.getPosition());
-            ps.setTeamSeason(seasonTeam);
-            ps.setStatus("ACTIVE");
-            playerSeasonRepository.save(ps);
-        }
-
-        // 3. Đăng ký HLV vào mùa giải (SeasonTeamCoach)
-        for (RegistrationCoach regCoach : reg.getCoaches()) {
-            SeasonTeamCoach stc = new SeasonTeamCoach();
-            stc.setCoach(regCoach.getCoach()); // Lấy coach gốc
-            stc.setTeam(team);
-            stc.setSeason(season);
-            stc.setRole(regCoach.getTournamentRole());
-            stc.setAssignedDate(LocalDate.now());
-            stc.setStatus("ACTIVE");
-            seasonTeamCoachRepository.save(stc);
-        }
-
-        // 4. Khởi tạo bảng xếp hạng
-        standingService.initializeStanding(season.getId(), team.getId());
-
-        reg.setStatus(RegistrationStatus.APPROVED);
-
-        RegistrationTeam savedRegistration = registrationTeamRepository.save(reg);
-        notifyClubAboutRegistrationResult(savedRegistration, true, null);
-        sendRegistrationResultEvents(savedRegistration, true);
-        sendTeamSeasonUpdatedEventToClubManager(savedRegistration);
     }
+
     private void validateNoDuplicateShirtNumbers(RegistrationTeam reg) {
         if (reg.getPlayers() == null || reg.getPlayers().isEmpty()) {
             throw new RuntimeException("Đơn đăng ký không có cầu thủ");
@@ -256,7 +452,6 @@ public class AdminApprovalService {
             }
         }
     }
-
     private boolean isForeignPlayer(Player player) {
         if (player == null || player.getNationality() == null) {
             return false;
@@ -270,24 +465,33 @@ public class AdminApprovalService {
                 && !nationality.equals("vn");
     }
 
-    @Transactional
-    public void rejectRegistration(Long id, String reason) {
-        RegistrationTeam reg = registrationTeamRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Không tìm thấy đơn đăng ký"));
 
-        if (reg.getStatus() != RegistrationStatus.PENDING) {
-            throw new RuntimeException("Chỉ có thể từ chối đơn đang chờ duyệt");
-        }
+// ==================== MAPPING HELPERS ====================
+// Các hàm convert Entity -> DTO hoặc DTO -> Entity.
 
-        reg.setStatus(RegistrationStatus.REJECTED);
-        reg.setRejectionReason(reason);
 
-        RegistrationTeam savedRegistration = registrationTeamRepository.save(reg);
-        notifyClubAboutRegistrationResult(savedRegistration, false, reason);
-        sendRegistrationResultEvents(savedRegistration, false);
+
+
+
+
+
+
+
+
+    // ==================== REALTIME / NOTIFICATION HELPERS ====================
+
+    /**
+     * Gửi thông báo và realtime sau khi hồ sơ đăng ký được duyệt.
+     *
+     * Người nhận:
+     * - Quản lý CLB: nhận kết quả duyệt và reload dữ liệu mùa giải của đội.
+     * - Admin: reload danh sách hồ sơ đăng ký nếu cần.
+     */
+    private void notifyRegistrationApproved(RegistrationTeam savedRegistration) {
+        notifyClubAboutRegistrationResult(savedRegistration, true, null);
+        sendRegistrationResultEvents(savedRegistration, true);
+        sendTeamSeasonUpdatedEventToClubManager(savedRegistration);
     }
-
-
     private void notifyClubAboutRegistrationResult(
             RegistrationTeam registration,
             boolean approved,

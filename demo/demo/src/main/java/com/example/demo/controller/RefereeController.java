@@ -2,7 +2,7 @@ package com.example.demo.controller;
 
 import com.example.demo.dto.referee.RefereeRequest;
 import com.example.demo.dto.referee.RefereeResponse;
-import com.example.demo.service.RefereeService;
+import com.example.demo.service.season.RefereeService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 

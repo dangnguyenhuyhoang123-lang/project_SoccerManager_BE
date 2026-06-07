@@ -11,9 +11,10 @@ import com.example.demo.entity.team.Team;
 import com.example.demo.entity.message.ErrorMessage;
 import com.example.demo.entity.user.Role;
 import com.example.demo.entity.user.User;
-import com.example.demo.service.RealtimeEventService;
+import com.example.demo.service.realtime.RealtimeEventService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.transaction.Transactional;
+import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -32,6 +33,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
 public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -40,20 +42,8 @@ public class UserService {
     private final TeamRepository teamRepository;
     private final RealtimeEventService realtimeEventService;
 
-    @Autowired
-    public UserService(UserRepository userRepository,
-                       PasswordEncoder passwordEncoder,
-                       AuthenticationManager authenticationManager,
-                       RoleRepository roleRepository,
-                       TeamRepository teamRepository,
-                       RealtimeEventService realtimeEventService) {
-        this.userRepository = userRepository;
-        this.passwordEncoder = passwordEncoder;
-        this.authenticationManager = authenticationManager;
-        this.roleRepository = roleRepository;
-        this.teamRepository=teamRepository;
-        this.realtimeEventService = realtimeEventService;
-    }
+
+
 
     public User findByUserName(String username)
     {

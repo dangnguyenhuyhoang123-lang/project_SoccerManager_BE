@@ -1,6 +1,6 @@
 package com.example.demo.dto;
 
-import com.example.demo.entity.GrassType;
+import com.example.demo.entity.team.GrassType;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;

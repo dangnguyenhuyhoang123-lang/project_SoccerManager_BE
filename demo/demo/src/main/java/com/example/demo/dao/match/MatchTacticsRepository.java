@@ -1,6 +1,6 @@
 package com.example.demo.dao.match;
 
-import com.example.demo.entity.MatchTactics;
+import com.example.demo.entity.match.MatchTactics;
 import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;

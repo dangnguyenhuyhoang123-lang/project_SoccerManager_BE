@@ -2,9 +2,8 @@ package com.example.demo.controller;
 
 import com.example.demo.dto.systemrule.SystemRuleRequest;
 import com.example.demo.dto.systemrule.SystemRuleResponse;
-import com.example.demo.service.SystemRuleService;
+import com.example.demo.service.season.SystemRuleService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;

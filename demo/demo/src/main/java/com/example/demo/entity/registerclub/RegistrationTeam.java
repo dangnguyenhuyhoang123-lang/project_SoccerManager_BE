@@ -1,6 +1,7 @@
 package com.example.demo.entity.registerclub;
 
 import com.example.demo.entity.*;
+import com.example.demo.entity.season.Season;
 import com.example.demo.entity.team.Team;
 import jakarta.persistence.*;
 import lombok.Data;

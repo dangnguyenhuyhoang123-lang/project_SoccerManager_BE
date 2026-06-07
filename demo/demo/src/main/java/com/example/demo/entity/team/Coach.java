@@ -1,0 +1,56 @@
+package com.example.demo.entity.team;
+
+import com.example.demo.entity.BaseEntity;
+import com.example.demo.entity.season.SeasonTeamCoach;
+import jakarta.persistence.*;
+import lombok.Data;
+
+import java.time.LocalDate;
+import java.util.List;
+
+@Entity
+@Data
+@Table(name = "coach")
+public class Coach extends BaseEntity {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column
+    private Long id;
+
+    @Column
+    private String name;
+
+    @Column
+    private String nationality;
+
+    @Column(name = "id_code")
+    private String IDCode;
+
+    @Column(columnDefinition = "LONGTEXT")
+    @Lob
+    private String avatar;
+
+    @Column(name = "birth_day")
+    private LocalDate birthDay;
+
+    @Column
+    private String des;
+
+    @Column
+    private String status;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "team_id")
+    private Team team;
+
+    // Xem sự nghiệp của HLV này đã qua những đội bóng nào
+    @OneToMany(mappedBy = "coach")
+    private List<SeasonTeamCoach> careerHistory;
+
+    @Column(name = "normalized_name")
+    private String normalizedName;
+
+    @Column(name = "source_name")
+    private String sourceName;
+}

@@ -1,5 +1,6 @@
 package com.example.demo.entity;
 
+import com.example.demo.entity.season.Season;
 import jakarta.persistence.*;
 import lombok.Data;
 

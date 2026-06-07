@@ -3,7 +3,7 @@ package com.example.demo.service.crawl;
 import com.example.demo.dao.NewsArticleRepository;
 import com.example.demo.dto.RealtimeEventDTO;
 import com.example.demo.entity.news.NewsArticle;
-import com.example.demo.service.RealtimeEventService;
+import com.example.demo.service.realtime.RealtimeEventService;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;

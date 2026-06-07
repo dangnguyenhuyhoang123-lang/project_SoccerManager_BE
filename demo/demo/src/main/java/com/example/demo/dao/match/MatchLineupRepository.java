@@ -1,6 +1,6 @@
 package com.example.demo.dao.match;
 
-import com.example.demo.entity.MatchLineup;
+import com.example.demo.entity.match.MatchLineup;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.EntityGraph;

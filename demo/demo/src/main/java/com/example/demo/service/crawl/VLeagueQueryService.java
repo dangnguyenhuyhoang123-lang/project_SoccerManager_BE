@@ -1,13 +1,10 @@
 package com.example.demo.service.crawl;
 
-import com.example.demo.dao.SystemRuleRepository;
 import com.example.demo.dao.match.MatchRepository;
 import com.example.demo.dto.crawl.VLeagueMatchResponse;
-import com.example.demo.entity.Match;
-import com.example.demo.entity.SeasonTeam;
-import com.example.demo.entity.SystemRule;
+import com.example.demo.entity.match.Match;
+import com.example.demo.entity.season.SeasonTeam;
 import lombok.AllArgsConstructor;
-import lombok.NoArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;

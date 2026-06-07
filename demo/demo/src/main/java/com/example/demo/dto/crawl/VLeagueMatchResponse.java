@@ -1,6 +1,6 @@
 package com.example.demo.dto.crawl;
 
-import com.example.demo.entity.MatchStatus;
+import com.example.demo.entity.match.MatchStatus;
 import lombok.Getter;
 import lombok.Setter;
 

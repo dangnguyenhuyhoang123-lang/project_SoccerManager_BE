@@ -1,8 +1,7 @@
 package com.example.demo.entity.player;
 
-import com.example.demo.entity.Match;
-import com.example.demo.entity.Player;
-import com.example.demo.entity.Season;
+import com.example.demo.entity.match.Match;
+import com.example.demo.entity.season.Season;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;

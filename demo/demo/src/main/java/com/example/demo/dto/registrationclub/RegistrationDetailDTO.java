@@ -1,6 +1,6 @@
 package com.example.demo.dto.registrationclub;
 
-import com.example.demo.entity.GrassType;
+import com.example.demo.entity.team.GrassType;
 import com.example.demo.entity.registerclub.FeeStatus;
 import com.example.demo.entity.registerclub.RegistrationStatus;
 import lombok.AllArgsConstructor;

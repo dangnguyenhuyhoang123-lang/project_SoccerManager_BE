@@ -1,6 +1,6 @@
 package com.example.demo.dto;
 
-import com.example.demo.entity.MatchStatus;
+import com.example.demo.entity.match.MatchStatus;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;

@@ -1,8 +1,7 @@
 package com.example.demo.dto;
 
-import com.example.demo.entity.EventType;
-import com.example.demo.entity.GoalType;
-import com.example.demo.entity.Player;
+import com.example.demo.entity.match.EventType;
+import com.example.demo.entity.match.GoalType;
 import lombok.Data;
 
 

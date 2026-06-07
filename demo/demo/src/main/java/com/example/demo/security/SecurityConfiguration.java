@@ -1,6 +1,6 @@
 package com.example.demo.security;
 
-import com.example.demo.service.MyUserServiceImpl;
+import com.example.demo.service.user.MyUserServiceImpl;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -84,13 +84,33 @@ public class SecurityConfiguration {
                         .authenticated()
 
                         // User tự cập nhật thông tin cá nhân.
-                        // Không nên permitAll.
+                        // Không permitAll.
                         .requestMatchers(HttpMethod.PUT, "/api/user-account/*/info")
                         .authenticated()
 
                         // Admin quản lý tài khoản
                         .requestMatchers("/api/user-account/**")
                         .hasRole("ADMIN")
+
+
+                        // ========= SEASON INVITATIONS =========
+                                // Admin gửi lời mời và xem danh sách lời mời theo mùa giải.
+                                .requestMatchers(HttpMethod.POST, "/api/seasons/*/invitations")
+                                .hasRole("ADMIN")
+
+                                .requestMatchers(HttpMethod.GET, "/api/seasons/*/invitations")
+                                .hasRole("ADMIN")
+
+                                // Club Manager xem lời mời của CLB mình.
+                                .requestMatchers(HttpMethod.GET, "/api/invitations/my")
+                                .hasRole("CLUB_MANAGER")
+
+                                // Club Manager phản hồi lời mời.
+                                .requestMatchers(HttpMethod.POST,
+                                        "/api/invitations/*/accept",
+                                        "/api/invitations/*/decline"
+                                )
+                                .hasRole("CLUB_MANAGER")
 
                         // =========================
                         // PUBLIC READ APIs
@@ -115,8 +135,7 @@ public class SecurityConfiguration {
                                 "/api/vleague/**"
                         ).permitAll()
 
-                        // Nếu public page cần xem player-season thì cho GET public.
-                        // Nếu bạn thấy lộ dữ liệu quá nhiều, đổi thành authenticated.
+
                         .requestMatchers(HttpMethod.GET,
                                 "/api/player-seasons/**",
                                 "/api/season-teams/**",
@@ -126,7 +145,7 @@ public class SecurityConfiguration {
                         // =========================
                         // CRAWLER / SYNC
                         // Chỉ ADMIN được crawl/sync dữ liệu.
-                        // Không nên permitAll.
+                        // Không permitAll.
                         // =========================
                         .requestMatchers("/api/vleague/sync/**")
                         .hasRole("ADMIN")
@@ -148,9 +167,9 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.DELETE, "/api/system-rules/**")
                         .hasRole("ADMIN")
 
-                        // =========================
-                        // REGISTRATION WORKFLOW
-                        // =========================
+
+                        // ====REGISTRATION WORKFLOW=====
+
 
                         // CLB gửi hồ sơ, Admin cũng có thể tạo/hỗ trợ nếu cần
                         .requestMatchers(HttpMethod.POST,
@@ -175,10 +194,9 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.DELETE, "/api/registrations/**")
                         .hasRole("ADMIN")
 
-                        // =========================
-                        // INVITATIONS
-                        // Nếu project có season invitation.
-                        // =========================
+
+                        // =========INVITATIONS=========
+
                         .requestMatchers(HttpMethod.GET, "/api/season-invitations/**")
                         .hasAnyRole("ADMIN", "CLUB_MANAGER")
 
@@ -191,9 +209,9 @@ public class SecurityConfiguration {
                         .requestMatchers(HttpMethod.DELETE, "/api/season-invitations/**")
                         .hasRole("ADMIN")
 
-                        // =========================
-                        // ADMIN MANAGEMENT
-                        // =========================
+
+                        // ===========ADMIN MANAGEMENT=============
+
 
                         // League / Season / Round
                         .requestMatchers(HttpMethod.POST,
@@ -252,7 +270,7 @@ public class SecurityConfiguration {
                                 "/api/matches/deleteMatch/**"
                         ).hasRole("ADMIN")
 
-                        // Match result/events/stats thường Admin cập nhật
+                        // Match result/events/stats
                         .requestMatchers(HttpMethod.POST,
                                 "/api/matches/*/events/**",
                                 "/api/matches/*/stats/**"
@@ -268,8 +286,8 @@ public class SecurityConfiguration {
                                 "/api/matches/*/stats/**"
                         ).hasRole("ADMIN")
 
-                        // =========================
-                        // REFEREE
+
+                        // ========REFEREE=========
                         // Public GET, Admin quản lý/phân công.
                         // =========================
                         .requestMatchers(HttpMethod.POST,
@@ -290,8 +308,8 @@ public class SecurityConfiguration {
                         // =========================
                         // TEAM / PLAYER / COACH / STADIUM
                         // Admin và Club Manager cùng quản lý.
-                        // Nhưng service phải kiểm tra Club Manager chỉ thao tác team của mình.
-                        // =========================
+
+
                         .requestMatchers(HttpMethod.POST,
                                 "/api/teams/**",
                                 "/api/stadiums/**",

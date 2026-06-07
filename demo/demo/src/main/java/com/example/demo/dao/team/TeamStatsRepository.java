@@ -1,6 +1,6 @@
 package com.example.demo.dao.team;
 
-import com.example.demo.entity.Season;
+import com.example.demo.entity.season.Season;
 import com.example.demo.entity.team.Team;
 import com.example.demo.entity.team.TeamStats;
 import org.springframework.data.jpa.repository.JpaRepository;

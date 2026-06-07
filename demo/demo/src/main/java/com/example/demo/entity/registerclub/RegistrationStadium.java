@@ -1,6 +1,6 @@
 package com.example.demo.entity.registerclub;
 
-import com.example.demo.entity.GrassType;
+import com.example.demo.entity.team.GrassType;
 import jakarta.persistence.*;
 import lombok.Data;
 

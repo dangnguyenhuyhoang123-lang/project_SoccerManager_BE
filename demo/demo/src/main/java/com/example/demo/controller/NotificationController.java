@@ -1,7 +1,7 @@
 package com.example.demo.controller;
 
 import com.example.demo.dto.NotificationDTO;
-import com.example.demo.service.NotificationService;
+import com.example.demo.service.realtime.NotificationService;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;

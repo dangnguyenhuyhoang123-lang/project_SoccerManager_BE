@@ -1,7 +1,7 @@
 package com.example.demo.dto.matchevent;
 
-import com.example.demo.entity.EventType;
-import com.example.demo.entity.GoalType;
+import com.example.demo.entity.match.EventType;
+import com.example.demo.entity.match.GoalType;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
